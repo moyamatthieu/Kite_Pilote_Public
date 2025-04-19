@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "author": "Claude via Chat",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-lcd2004", "id": "lcd", "top": 16, "left": 274.4, "attrs": { "pins": "i2c" } },
+    {
+      "type": "wokwi-led",
+      "id": "led_green",
+      "top": 63.6,
+      "left": 138.2,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_red",
+      "top": 73.2,
+      "left": 167,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_roll",
+      "top": -20.5,
+      "left": -230.6,
+      "attrs": { "label": "Roll" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_pitch",
+      "top": -126.1,
+      "left": -393.8,
+      "attrs": { "label": "Pitch" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_yaw",
+      "top": -126.1,
+      "left": -288.2,
+      "attrs": { "label": "Yaw" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_tension",
+      "top": -20.5,
+      "left": -336.2,
+      "attrs": { "label": "Tension" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_wind_speed",
+      "top": -20.5,
+      "left": -441.8,
+      "attrs": { "label": "Wind Speed" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_wind_dir",
+      "top": -126.1,
+      "left": -499.4,
+      "attrs": { "label": "Wind Dir" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo_direction",
+      "top": -356.2,
+      "left": -75,
+      "rotate": 270,
+      "attrs": { "label": "Direction" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo_trim",
+      "top": -356.2,
+      "left": 88.2,
+      "rotate": 270,
+      "attrs": { "label": "Trim" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo_winch",
+      "top": -356.2,
+      "left": 270.6,
+      "rotate": 270,
+      "attrs": { "label": "Winch" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_mode",
+      "top": 303.8,
+      "left": 163.2,
+      "attrs": { "color": "blue", "label": "Mode" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_emergency",
+      "top": 207.8,
+      "left": 163.2,
+      "attrs": { "color": "red", "label": "Emergency" }
+    },
+    { "type": "wokwi-gnd", "id": "gnd1", "top": 364.8, "left": -144.6, "attrs": {} },
+    { "type": "wokwi-vcc", "id": "vcc1", "top": 259.96, "left": -48, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:21", "lcd:SDA", "blue", [ "h120.04", "v-9.6", "h57.6" ] ],
+    [ "esp:22", "lcd:SCL", "yellow", [ "h100.84", "v28.5" ] ],
+    [ "esp:GND", "lcd:GND", "black", [] ],
+    [ "esp:16", "led_green:A", "green", [] ],
+    [ "esp:17", "led_red:A", "red", [] ],
+    [ "esp:34", "pot_roll:SIG", "blue", [] ],
+    [ "esp:35", "pot_pitch:SIG", "blue", [] ],
+    [ "esp:32", "pot_yaw:SIG", "blue", [] ],
+    [ "esp:33", "pot_tension:SIG", "blue", [] ],
+    [ "esp:36", "pot_wind_speed:SIG", "blue", [] ],
+    [ "esp:39", "pot_wind_dir:SIG", "blue", [] ],
+    [ "esp:23", "servo_direction:PWM", "orange", [ "h-148.76", "v-240", "h67" ] ],
+    [ "esp:27", "servo_trim:PWM", "orange", [ "h-33.41", "v-316.8", "h211" ] ],
+    [ "esp:14", "servo_winch:PWM", "orange", [ "h-43.01", "v-316.8", "h403" ] ],
+    [ "esp:4", "btn_mode:1.l", "purple", [ "h33.64", "v172.8" ] ],
+    [ "esp:5", "btn_emergency:1.l", "purple", [ "h24.04", "v105.6" ] ],
+    [ "led_green:C", "esp:GND", "black", [] ],
+    [ "led_red:C", "esp:GND", "black", [] ],
+    [ "pot_roll:GND", "gnd1:GND", "black", [ "v124.8", "h76.8" ] ],
+    [ "pot_pitch:GND", "gnd1:GND", "black", [ "v19.2", "h230.4" ] ],
+    [ "pot_yaw:GND", "gnd1:GND", "black", [ "v19.2", "h124.8" ] ],
+    [ "pot_tension:GND", "gnd1:GND", "black", [ "v124.8", "h172.8" ] ],
+    [ "pot_wind_speed:GND", "gnd1:GND", "black", [ "v115.2", "h268.8" ] ],
+    [ "pot_wind_dir:GND", "gnd1:GND", "black", [ "v28.8", "h336" ] ],
+    [ "pot_roll:VCC", "vcc1:VCC", "red", [ "v105.6", "h56.8", "v134.4" ] ],
+    [ "pot_yaw:VCC", "vcc1:VCC", "red", [ "v19.2", "h114.4", "v326.4" ] ],
+    [ "pot_tension:VCC", "vcc1:VCC", "red", [ "v105.6", "h162.4", "v134.4" ] ],
+    [ "pot_wind_speed:VCC", "vcc1:VCC", "red", [ "v105.6", "h268", "v134.4" ] ],
+    [ "pot_wind_dir:VCC", "vcc1:VCC", "red", [ "v19.2", "h325.6", "v326.4" ] ],
+    [ "servo_direction:V+", "vcc1:VCC", "red", [ "v38.4", "h-134.3", "v451.2" ] ],
+    [ "servo_trim:V+", "vcc1:VCC", "red", [ "v38.4", "h-297.5", "v451.2" ] ],
+    [ "servo_winch:V+", "vcc1:VCC", "red", [ "v29.8", "h-479.9", "v459.8" ] ],
+    [ "servo_trim:GND", "gnd1:GND", "black", [ "v48", "h-297.6" ] ],
+    [ "servo_winch:GND", "gnd1:GND", "black", [ "v49", "h-487.8" ] ],
+    [ "btn_mode:2.r", "gnd1:GND", "black", [ "h19.4", "v48.2" ] ],
+    [ "btn_emergency:2.r", "gnd1:GND", "black", [ "h19.4", "v125" ] ],
+    [ "gnd1:GND", "lcd:GND", "black", [ "h384", "v-316.8" ] ],
+    [ "vcc1:VCC", "lcd:VCC", "red", [ "h278.4", "v-230.5" ] ],
+    [ "pot_wind_dir:VCC", "pot_pitch:VCC", "red", [ "v19.2", "h105.6" ] ]
+  ],
+  "dependencies": {}
+}
