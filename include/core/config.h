@@ -78,6 +78,8 @@ const uint8_t LED_RED_PIN = 17;     // Pin pour la LED rouge (erreur)
 
 // --- ÉCRAN LCD ---
 const uint8_t LCD_I2C_ADDR = 0x27;  // Adresse I2C du LCD
+#define LCD1_I2C_ADDR 0x27          // Adresse I2C du premier écran LCD
+#define LCD2_I2C_ADDR 0x3F          // Adresse I2C du second écran LCD
 const uint8_t LCD_COLS = 20;        // 20 colonnes
 const uint8_t LCD_ROWS = 4;         // 4 lignes
 const uint8_t I2C_SDA_PIN = 21;     // Pin SDA pour I2C (LCD)

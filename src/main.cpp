@@ -12,6 +12,9 @@
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <LiquidCrystal_I2C.h>
+#include <Adafruit_ILI9341.h>
+#include <Adafruit_FT6206.h>
 
 // Inclusions des modules de base
 #include "core/config.h"
@@ -39,7 +42,13 @@ LedModule ledStatus(LED_GREEN_PIN, "LED_STATUS");
 LedModule ledError(LED_RED_PIN, "LED_ERROR");
 
 // Gestionnaire de l'écran LCD
-LcdModule lcd;
+LcdModule lcd(LCD1_I2C_ADDR, LCD_COLS, LCD_ROWS); // LCD principal
+LcdModule lcd2(LCD2_I2C_ADDR, LCD_COLS, LCD_ROWS); // Deuxième LCD
+
+// Fonction utilitaire pour sélectionner l'écran LCD
+LcdModule& getLcd(uint8_t screen = 1) {
+    return (screen == 2) ? lcd2 : lcd;
+}
 
 // Gestionnaire des capteurs
 SensorModule sensors;
@@ -54,6 +63,20 @@ AutopilotModule autopilot;
 #ifdef SIMULATION_MODE
 SimulationModule simulation;
 #endif
+
+// Gestionnaire de l'écran TFT et du tactile
+#define TFT_CS   15
+#define TFT_DC   2
+#define TFT_RST  4
+#define TFT_MOSI 23
+#define TFT_CLK  18
+#define TFT_MISO 19
+#define TFT_LED  21
+#define TOUCH_SDA 13
+#define TOUCH_SCL 12
+
+Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);
+Adafruit_FT6206 ctp = Adafruit_FT6206();
 
 // Variables système globales
 SystemStatus systemStatus;
@@ -164,7 +187,8 @@ void sendHeartbeat() {
 }
 
 // Affichage périodique des informations sur l'écran LCD
-void updateDisplay() {
+void updateDisplay(uint8_t screen = 1) {
+    LcdModule& lcdTarget = getLcd(screen);
     // Limiter les mises à jour pour ne pas surcharger l'écran
     unsigned long currentTime = millis();
     if (currentTime - lastDisplayUpdateTime < DISPLAY_UPDATE_INTERVAL) {
@@ -175,31 +199,41 @@ void updateDisplay() {
     // Récupérer les données des capteurs
     IMUData imuData = sensors.getIMUData();
     LineData lineData = sensors.getLineData();
+    WindData windData = sensors.getWindData();
     
     // Récupérer les données de l'autopilote
     AutopilotStatus autopilotStatus = autopilot.getStatus();
     
-    // Afficher l'état du système sur l'écran LCD
-    lcd.showSystemScreen(
-        autopilotStatus.statusMessage,
-        imuData.roll,
-        imuData.pitch,
-        lineData.tension,
-        autopilotStatus.powerGenerated
-    );
-    
-    // Afficher une barre de progression pour les séquences de décollage/atterrissage
-    if (autopilotStatus.mode == AUTOPILOT_LAUNCH || autopilotStatus.mode == AUTOPILOT_LAND) {
-        lcd.showProgressBar(3, autopilotStatus.completionPercent);
-    }
-    
-    // Afficher l'état d'erreur si présent
-    if (systemStatus.isError) {
-        // Afficher le code d'erreur toutes les 10 secondes
-        if ((currentTime / 10000) % 2 == 0) {
-            snprintf(messageBuffer, sizeof(messageBuffer), "ERR#%d", systemStatus.lastError);
-            lcd.print(messageBuffer, 16, 0);
+    if (screen == 1) {
+        lcdTarget.showSystemScreen(
+            autopilotStatus.statusMessage,
+            imuData.roll,
+            imuData.pitch,
+            lineData.tension,
+            autopilotStatus.powerGenerated
+        );
+        
+        // Afficher une barre de progression pour les séquences de décollage/atterrissage
+        if (autopilotStatus.mode == AUTOPILOT_LAUNCH || autopilotStatus.mode == AUTOPILOT_LAND) {
+            lcdTarget.showProgressBar(3, autopilotStatus.completionPercent);
         }
+        
+        // Afficher l'état d'erreur si présent
+        if (systemStatus.isError) {
+            // Afficher le code d'erreur toutes les 10 secondes
+            if ((currentTime / 10000) % 2 == 0) {
+                snprintf(messageBuffer, sizeof(messageBuffer), "ERR#%d", systemStatus.lastError);
+                lcdTarget.print(messageBuffer, 16, 0);
+            }
+        }
+    } else if (screen == 2) {
+        char buffer[21];
+        snprintf(buffer, sizeof(buffer), "WindDir: %5.1f deg", windData.direction);
+        lcdTarget.print(buffer, 0, 0);
+        snprintf(buffer, sizeof(buffer), "WindSpd: %5.1f m/s", windData.speed);
+        lcdTarget.print(buffer, 0, 1);
+        snprintf(buffer, sizeof(buffer), "Tension: %5.1f N", lineData.tension);
+        lcdTarget.print(buffer, 0, 2);
     }
 }
 
@@ -230,6 +264,12 @@ bool initializeSystem() {
     // Initialiser l'écran LCD
     if (!lcd.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation de l'écran LCD");
+        ledError.setPattern(LED_PATTERN_ON);
+        success = false;
+    }
+    
+    if (!lcd2.begin()) {
+        LOG_ERROR("MAIN", "Échec d'initialisation du deuxième écran LCD");
         ledError.setPattern(LED_PATTERN_ON);
         success = false;
     }
@@ -267,6 +307,18 @@ bool initializeSystem() {
         success = false;
     }
     #endif
+    
+    // Initialiser l'écran TFT
+    tft.begin();
+    tft.setRotation(1);
+    tft.fillScreen(ILI9341_BLACK);
+    tft.setTextColor(ILI9341_WHITE);
+    tft.setTextSize(2);
+    if (!ctp.begin(40)) {
+        Serial.println("Erreur: écran tactile non détecté !");
+    } else {
+        Serial.println("Tactile FT6206 prêt.");
+    }
     
     // Configurer un watchdog logiciel pour éviter les blocages (10 secondes)
     esp_task_wdt_init(10, true);
@@ -359,7 +411,20 @@ void loop() {
     servos.update();
     
     // Mise à jour de l'affichage LCD
-    updateDisplay();
+    updateDisplay(1); // Affichage sur le LCD principal
+    updateDisplay(2); // Affichage sur le second LCD
+    
+    // Affichage d'exemple sur le TFT
+    tft.setCursor(10, 10);
+    tft.setTextColor(ILI9341_YELLOW);
+    tft.setTextSize(2);
+    tft.print("Kite Pilote TFT");
+    
+    // Lecture tactile
+    if (ctp.touched()) {
+        TS_Point p = ctp.getPoint();
+        tft.fillCircle(p.x, p.y, 5, ILI9341_RED);
+    }
     
     // Mise à jour du statut système
     systemStatus.uptime = millis();

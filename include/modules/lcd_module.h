@@ -38,8 +38,15 @@ public:
         _lcd(LCD_I2C_ADDR, LCD_COLS, LCD_ROWS), 
         _initialized(false),
         _i2cError(false),
-        _lastRefreshTime(0)
+        _lastRefreshTime(0),
+        _addr(LCD_I2C_ADDR)
     {
+        // Initialisation complète dans begin()
+    }
+
+    // Constructeur avec adresse personnalisable
+    LcdModule(uint8_t addr = LCD_I2C_ADDR, uint8_t cols = LCD_COLS, uint8_t rows = LCD_ROWS)
+        : _lcd(addr, cols, rows), _initialized(false), _i2cError(false), _lastRefreshTime(0), _addr(addr) {
         // Initialisation complète dans begin()
     }
     
@@ -48,17 +55,17 @@ public:
      * @return true si l'initialisation a réussi, false sinon
      */
     bool begin() {
-        LOG_INFO("LCD", "Initialisation de l'écran LCD (adresse 0x%02X)...", LCD_I2C_ADDR);
+        LOG_INFO("LCD", "Initialisation de l'écran LCD (adresse 0x%02X)...", _addr);
         
         // Initialiser I2C avec les broches définies
         Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
         
         // Vérifier si l'écran LCD est présent sur le bus I2C
-        Wire.beginTransmission(LCD_I2C_ADDR);
+        Wire.beginTransmission(_addr);
         _i2cError = (Wire.endTransmission() != 0);
         
         if (_i2cError) {
-            LOG_ERROR("LCD", "Échec de communication avec l'écran LCD à l'adresse 0x%02X", LCD_I2C_ADDR);
+            LOG_ERROR("LCD", "Échec de communication avec l'écran LCD à l'adresse 0x%02X", _addr);
             return false;
         }
         
@@ -93,15 +100,15 @@ public:
         if (!_initialized) return false;
         
         // Tenter de communiquer avec l'écran
-        Wire.beginTransmission(LCD_I2C_ADDR);
+        Wire.beginTransmission(_addr);
         bool error = (Wire.endTransmission() != 0);
         
         if (error && !_i2cError) {
-            LOG_ERROR("LCD", "Connexion à l'écran LCD perdue");
+            LOG_ERROR("LCD", "Connexion à l'écran LCD perdue (0x%02X)", _addr);
             _i2cError = true;
             return false;
         } else if (!error && _i2cError) {
-            LOG_INFO("LCD", "Connexion à l'écran LCD rétablie");
+            LOG_INFO("LCD", "Connexion à l'écran LCD rétablie (0x%02X)", _addr);
             _i2cError = false;
         }
         
@@ -116,16 +123,25 @@ public:
      * @return true si l'opération a réussi
      */
     bool print(const char* message, uint8_t col = 0, uint8_t row = 0) {
+        if (col == 0 && strlen(message) <= LCD_COLS) {
+            printDiff(message, row);
+            return true;
+        }
+        // Cas général (affichage partiel ou colonne > 0)
         if (!_initialized || _i2cError) return false;
-        
-        // Vérifier les limites
         if (col >= LCD_COLS || row >= LCD_ROWS) {
             LOG_WARNING("LCD", "Coordonnées hors limites: %d,%d", col, row);
             return false;
         }
-        
         _lcd.setCursor(col, row);
         _lcd.print(message);
+        // Mettre à jour le tampon _lastLcd si affichage complet sur la ligne
+        size_t len = strlen(message);
+        if (col == 0 && len <= LCD_COLS) {
+            strncpy(_lastLcd[row], message, LCD_COLS);
+            for (size_t i = len; i < LCD_COLS; i++) _lastLcd[row][i] = ' ';
+            _lastLcd[row][LCD_COLS] = '\0';
+        }
         return true;
     }
     
@@ -185,10 +201,10 @@ public:
             
             // Tester la connexion et réinitialiser si nécessaire
             if (_i2cError) {
-                LOG_INFO("LCD", "Tentative de reconnexion à l'écran LCD...");
-                Wire.beginTransmission(LCD_I2C_ADDR);
+                LOG_INFO("LCD", "Tentative de reconnexion à l'écran LCD (0x%02X)...", _addr);
+                Wire.beginTransmission(_addr);
                 if (Wire.endTransmission() == 0) {
-                    LOG_INFO("LCD", "Connexion rétablie, réinitialisation de l'écran");
+                    LOG_INFO("LCD", "Connexion rétablie, réinitialisation de l'écran (0x%02X)", _addr);
                     _lcd.init();
                     _lcd.backlight();
                     defineCustomCharacters();
@@ -208,32 +224,15 @@ public:
      */
     void showProgressBar(uint8_t row, int percentage) {
         if (!_initialized || _i2cError || row >= LCD_ROWS) return;
-        
-        // Limiter le pourcentage entre 0 et 100
         percentage = constrain(percentage, 0, 100);
-        
-        // Calculer le nombre de caractères remplis (sur 20 colonnes)
         int filledChars = map(percentage, 0, 100, 0, LCD_COLS);
-        
-        // Caractères pour afficher une barre de progression plus fluide
-        static const char barChars[] = { ' ', char(0x1), char(0x2), char(0x3), char(0xFF) };
-        
-        // Partie entièrement remplie
-        _lcd.setCursor(0, row);
-        for (int i = 0; i < filledChars; i++) {
-            _lcd.write(0xFF); // Caractère "bloc plein"
+        char buffer[21];
+        for (int i = 0; i < LCD_COLS - 4; i++) {
+            buffer[i] = (i < filledChars) ? 0xFF : '-';
         }
-        
-        // Partie vide
-        for (int i = filledChars; i < LCD_COLS; i++) {
-            _lcd.write('-');  // Caractère pour partie vide
-        }
-        
-        // Afficher le pourcentage à la fin
-        char buffer[5];
-        snprintf(buffer, sizeof(buffer), "%3d%%", percentage);
-        _lcd.setCursor(LCD_COLS - 4, row);
-        _lcd.print(buffer);
+        snprintf(buffer + LCD_COLS - 4, 5, "%3d%%", percentage);
+        buffer[LCD_COLS] = '\0';
+        printDiff(buffer, row);
     }
     
     /**
@@ -246,23 +245,13 @@ public:
      */
     void showValue(const char* name, float value, const char* unit, uint8_t row, uint8_t precision = 1) {
         if (!_initialized || _i2cError || row >= LCD_ROWS) return;
-        
-        char buffer[21]; // Buffer pour stocker le texte formaté (20 colonnes + null)
-        char format[10]; // Buffer pour le format
-        
-        // Construire le format selon la précision demandée
+        char buffer[21];
+        char format[10];
         snprintf(format, sizeof(format), "%%.%df", precision);
-        
-        // Générer le format complet pour snprintf
         char fullFormat[32];
-        snprintf(fullFormat, sizeof(fullFormat), "%%-%ds %s %%-%ds", 
-                9, format, 4);
-        
-        // Formater la chaîne finale
+        snprintf(fullFormat, sizeof(fullFormat), "%%-%ds %s %%-%ds", 9, format, 4);
         snprintf(buffer, sizeof(buffer), fullFormat, name, value, unit);
-        
-        _lcd.setCursor(0, row);
-        _lcd.print(buffer);
+        printDiff(buffer, row);
     }
     
     /**
@@ -273,28 +262,26 @@ public:
      */
     void showStatus(const char* status, uint8_t row, uint8_t icon = 255) {
         if (!_initialized || _i2cError || row >= LCD_ROWS) return;
-        
-        // Effacer la ligne d'abord
-        clearLine(row);
-        
-        // Calculer la longueur totale avec l'icône
+        char buffer[21];
         int statusLen = strlen(status);
         int totalLen = statusLen;
-        if (icon != 255) totalLen += 2; // Icône + espace
-        
-        // Centrer le message d'état
+        if (icon != 255) totalLen += 2;
         int spaces = (LCD_COLS - totalLen) / 2;
-        spaces = max(0, spaces); // Éviter les valeurs négatives
-        
-        _lcd.setCursor(spaces, row);
-        
-        // Afficher l'icône si nécessaire
-        if (icon != 255) {
-            _lcd.write(icon);
-            _lcd.write(' ');
+        spaces = max(0, spaces);
+        int pos = 0;
+        if (spaces > 0) {
+            memset(buffer, ' ', spaces);
+            pos += spaces;
         }
-        
-        _lcd.print(status);
+        if (icon != 255) {
+            buffer[pos++] = icon;
+            buffer[pos++] = ' ';
+        }
+        strncpy(buffer + pos, status, LCD_COLS - pos);
+        pos += statusLen;
+        if (pos < LCD_COLS) memset(buffer + pos, ' ', LCD_COLS - pos);
+        buffer[LCD_COLS] = '\0';
+        printDiff(buffer, row);
     }
     
     /**
@@ -307,37 +294,22 @@ public:
      */
     void showSystemScreen(const char* mode, float roll, float pitch, float tension, float power) {
         if (!_initialized || _i2cError) return;
-        
-        clear();
-        
-        // Utiliser un tampon statique pour économiser la mémoire
-        static char buffer[21];
-        
         // Ligne 1: Mode avec icône si statut OK
         uint8_t icon = (roll >= -60 && roll <= 60 && pitch >= -60 && pitch <= 60) ? CHAR_OK : 255;
-        
-        // Afficher le mode avec une icône si tout va bien
+        char buffer[21];
         snprintf(buffer, sizeof(buffer), "Mode: %s", mode);
-        
         if (icon != 255) {
-            print(buffer, 0, 0);
-            _lcd.setCursor(LCD_COLS - 1, 0);
-            _lcd.write(icon);
-        } else {
-            print(buffer, 0, 0);
+            int len = strlen(buffer);
+            if (len < LCD_COLS) buffer[LCD_COLS - 1] = icon;
+            buffer[LCD_COLS] = '\0';
         }
-        
-        // Ligne 2: Orientation (roll et pitch)
+        printDiff(buffer, 0);
         snprintf(buffer, sizeof(buffer), "R:%5.1f\xDF  P:%5.1f\xDF", roll, pitch);
-        print(buffer, 0, 1);
-        
-        // Ligne 3: Tension de ligne
+        printDiff(buffer, 1);
         snprintf(buffer, sizeof(buffer), "Tension: %5.1f N", tension);
-        print(buffer, 0, 2);
-        
-        // Ligne 4: Puissance générée
+        printDiff(buffer, 2);
         snprintf(buffer, sizeof(buffer), "Puissance: %5.1f W", power);
-        print(buffer, 0, 3);
+        printDiff(buffer, 3);
     }
     
     /**
@@ -348,35 +320,29 @@ public:
      */
     void showErrorScreen(const char* title, const char* message, int code = -1) {
         if (!_initialized || _i2cError) return;
-        
-        clear();
-        
         // Titre de l'erreur centré avec icône
         showStatus(title, 0, CHAR_ERROR);
-        
         // Message d'erreur (peut tenir sur 2 lignes)
+        char buffer[LCD_COLS + 1];
         if (strlen(message) <= LCD_COLS) {
-            // Cas simple: message sur une ligne
-            print(message, 0, 1);
-        } else {
-            // Message sur deux lignes
-            char buffer[LCD_COLS + 1];
             strncpy(buffer, message, LCD_COLS);
             buffer[LCD_COLS] = '\0';
-            print(buffer, 0, 1);
-            
-            if (strlen(message) > LCD_COLS) {
-                strncpy(buffer, message + LCD_COLS, LCD_COLS);
-                buffer[LCD_COLS] = '\0';
-                print(buffer, 0, 2);
+            printDiff(buffer, 1);
+            if (code >= 0) {
+                snprintf(buffer, sizeof(buffer), "Code: %d", code);
+                printDiff(buffer, 2);
             }
-        }
-        
-        // Afficher le code d'erreur s'il est valide
-        if (code >= 0) {
-            char buffer[21];
-            snprintf(buffer, sizeof(buffer), "Code: %d", code);
-            print(buffer, 0, 3);
+        } else {
+            strncpy(buffer, message, LCD_COLS);
+            buffer[LCD_COLS] = '\0';
+            printDiff(buffer, 1);
+            strncpy(buffer, message + LCD_COLS, LCD_COLS);
+            buffer[LCD_COLS] = '\0';
+            printDiff(buffer, 2);
+            if (code >= 0) {
+                snprintf(buffer, sizeof(buffer), "Code: %d", code);
+                printDiff(buffer, 3);
+            }
         }
     }
     
@@ -388,25 +354,15 @@ public:
      */
     void showSensorStatus(bool imuValid, bool tensionValid, bool windValid) {
         if (!_initialized || _i2cError) return;
-        
-        clear();
-        print(F("État des capteurs:"), 0, 0);
-        
-        // Affichage de l'état avec icône
-        print(F("IMU:      "), 0, 1);
-        _lcd.setCursor(10, 1);
-        _lcd.write(imuValid ? CHAR_OK : CHAR_ERROR);
-        print(imuValid ? F(" OK") : F(" ERR"), 12, 1);
-        
-        print(F("Tension:  "), 0, 2);
-        _lcd.setCursor(10, 2);
-        _lcd.write(tensionValid ? CHAR_OK : CHAR_ERROR);
-        print(tensionValid ? F(" OK") : F(" ERR"), 12, 2);
-        
-        print(F("Vent:     "), 0, 3);
-        _lcd.setCursor(10, 3);
-        _lcd.write(windValid ? CHAR_OK : CHAR_WARNING);
-        print(windValid ? F(" OK") : F(" N/A"), 12, 3);
+        char buffer[21];
+        snprintf(buffer, sizeof(buffer), "État des capteurs:");
+        printDiff(buffer, 0);
+        snprintf(buffer, sizeof(buffer), "IMU:      %s", imuValid ? "OK" : "ERR");
+        printDiff(buffer, 1);
+        snprintf(buffer, sizeof(buffer), "Tension:  %s", tensionValid ? "OK" : "ERR");
+        printDiff(buffer, 2);
+        snprintf(buffer, sizeof(buffer), "Vent:     %s", windValid ? "OK" : "N/A");
+        printDiff(buffer, 3);
     }
     
     /**
@@ -428,7 +384,44 @@ private:
     bool _initialized;        // État d'initialisation
     bool _i2cError;           // Indicateur de problème I2C
     unsigned long _lastRefreshTime; // Dernière tentative de rafraîchissement
-    
+    char _lastLcd[4][21] = {"", "", "", ""}; // Tampon de l'affichage précédent (20+1)
+    uint8_t _addr;            // Adresse I2C propre à chaque instance
+
+    /**
+     * @brief Affiche une chaîne sur une ligne en ne modifiant que les caractères différents
+     * @param message Texte à afficher (max 20 caractères)
+     * @param row Ligne (0-3)
+     */
+    void printDiff(const char* message, uint8_t row) {
+        if (!_initialized || _i2cError || row >= LCD_ROWS) return;
+        size_t len = strlen(message);
+        if (len > LCD_COLS) len = LCD_COLS;
+        for (size_t col = 0; col < len; col++) {
+            if (_lastLcd[row][col] != message[col]) {
+                _lcd.setCursor(col, row);
+                _lcd.write(message[col]);
+                _lastLcd[row][col] = message[col];
+            }
+        }
+        // Effacer les caractères restants si la nouvelle chaîne est plus courte
+        for (size_t col = len; col < LCD_COLS; col++) {
+            if (_lastLcd[row][col] != ' ') {
+                _lcd.setCursor(col, row);
+                _lcd.write(' ');
+                _lastLcd[row][col] = ' ';
+            }
+        }
+        _lastLcd[row][LCD_COLS] = '\0';
+    }
+
+    // Surcharge pour accepter les chaînes Flash (F("..."))
+    void printDiff(const __FlashStringHelper* message, uint8_t row) {
+        char buffer[LCD_COLS + 1];
+        strncpy_P(buffer, (const char*)message, LCD_COLS);
+        buffer[LCD_COLS] = '\0';
+        printDiff(buffer, row);
+    }
+
     /**
      * @brief Définit les caractères personnalisés dans la mémoire CGRAM du LCD
      */
