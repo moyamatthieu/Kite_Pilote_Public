@@ -8,5 +8,5 @@ elf = ".pio/build/esp32dev/firmware.elf"
 from = "localhost:8180"
 to = "target:80"
 
-[wokwi.littlefs]"index.html" = "data/index.html"
+[wokwi.littlefs]
 "index.html" = "data/index.html"

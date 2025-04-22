@@ -1,0 +1,90 @@
+# Conversation sur la résolution des problèmes LittleFS - 22 avril 2025
+
+## Problème initial
+
+```
+Version v2.0.0.0 - 19/04/2025
+=== Système de journalisation initialisé ===
+Niveau de log: INFO
+Taille du buffer: 50 entrées
+2803 [ERROR] LCD: Échec de communication avec l'écran LCD à l'adresse 0x3F
+2804 [WARNING] MAIN: Deuxième écran LCD non détecté, désactivé
+E (3099) esp_littlefs: partition "spiffs" could not be found
+E (3099) esp_littlefs: Failed to initialize LittleFS
+[  4065][E][LittleFS.cpp:98] begin(): Mounting LittleFS failed! Error: 261
+4081 [WARNING] WEB: LittleFS non disponible, interface web utilisera du contenu intégré
+```
+
+## Analyse du problème
+
+Après avoir examiné la configuration du projet, il a été constaté que:
+
+1. Le fichier `custom_partitions.csv` contenait une partition nommée "spiffs" avec le type "spiffs":
+```csv
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x140000,
+app1,     app,  ota_1,   0x150000,0x140000,
+spiffs,   data, spiffs,  0x290000,0x170000,
+```
+
+2. Cependant, le code tentait d'utiliser LittleFS, qui par défaut recherche une partition nommée "littlefs" et non "spiffs".
+
+## Solutions explorées
+
+### Solution 1: Adaptation par flags de compilation (non retenue)
+
+Une première solution était d'adapter le code pour qu'il utilise la partition "spiffs" pour LittleFS via des flags de compilation:
+
+```ini
+build_flags = 
+    -DSIMULATION_MODE
+    -I include
+    -I include/core
+    -I include/modules
+    -I include/utils
+    -I include/interfaces
+    -DCONFIG_LITTLEFS_FOR_IDF_3_2
+    -DLIT_PARTITION_LABEL=\"spiffs\"
+```
+
+### Solution 2: Configuration correcte de LittleFS (retenue)
+
+Plutôt que d'adapter le code, la meilleure solution était de configurer correctement la partition pour LittleFS:
+
+1. Modification du fichier `custom_partitions.csv`:
+```csv
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x140000,
+app1,     app,  ota_1,   0x150000,0x140000,
+littlefs, data, littlefs,0x290000,0x170000,
+```
+
+2. Retour à une configuration standard dans `platformio.ini` sans les flags de compilation spécifiques:
+```ini
+build_flags = 
+    -DSIMULATION_MODE
+    -I include
+    -I include/core
+    -I include/modules
+    -I include/utils
+    -I include/interfaces
+```
+
+## Avantages de la solution retenue
+
+- Respecte les conventions de nommage standard pour LittleFS
+- Évite l'utilisation de drapeaux de compilation spéciaux qui pourraient rendre le code moins portable
+- Rend la configuration plus claire et plus facile à comprendre
+
+## Prochaines étapes recommandées
+
+Pour que ces changements prennent effet:
+1. Recompiler et téléverser le code sur l'ESP32
+2. Formater la nouvelle partition "littlefs"
+3. Téléverser à nouveau les fichiers web avec le script `data_to_littlefs.py`
+
+Ces modifications devraient résoudre les erreurs de montage LittleFS qui apparaissaient dans les logs.
