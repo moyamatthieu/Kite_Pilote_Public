@@ -46,8 +46,8 @@ LedModule ledStatus(LED_GREEN_PIN, "LED_STATUS");
 LedModule ledError(LED_RED_PIN, "LED_ERROR");
 
 // Gestionnaire de l'écran LCD
-LcdModule lcd(LCD1_I2C_ADDR, LCD_COLS, LCD_ROWS); // LCD principal
-LcdModule lcd2(LCD2_I2C_ADDR, LCD_COLS, LCD_ROWS); // Deuxième LCD
+LcdModule lcd; // LCD principal (détection auto)
+LcdModule lcd2; // Deuxième LCD (détection auto)
 
 // Fonction utilitaire pour sélectionner l'écran LCD
 LcdModule& getLcd(uint8_t screen = 1) {
@@ -118,186 +118,128 @@ void handleEmergencyStop() {
 }
 
 //=============================================================================
-// FONCTIONS UTILITAIRES
-//=============================================================================
-
-//=============================================================================
 // FONCTIONS DE GESTION DES PERFORMANCES ET DE LA SÉCURITÉ
 //=============================================================================
 
 // Vérifie et met à jour les informations sur la mémoire disponible
 void verifierMemoire() {
+    static unsigned long lastMemoryCheckTime = 0;
     unsigned long currentTime = millis();
     if (currentTime - lastMemoryCheckTime < MEMORY_CHECK_INTERVAL) {
         return;
     }
     lastMemoryCheckTime = currentTime;
     
-    systemStatus.freeMemory = ESP.getFreeHeap();
-    
-    if (systemStatus.freeMemory < MIN_FREE_MEMORY) {
-        LOG_WARNING("SYSTEM", "Mémoire faible: %d octets", systemStatus.freeMemory);
-        systemStatus.isError = true;
-        systemStatus.lastError = ERROR_MEMORY_LOW;
-        ledError.setPattern(LED_PATTERN_SLOW_BLINK);
-    }
-    
-    LOG_DEBUG("MEMORY", "Mémoire libre: %d octets", systemStatus.freeMemory);
+    mettreAJourEtatDeLaMemoire();
 }
 
 // Effectue des vérifications périodiques de santé des capteurs
 void verifierCapteurs() {
+    static unsigned long lastSensorCheckTime = 0;
     unsigned long currentTime = millis();
     if (currentTime - lastSensorCheckTime < SENSOR_CHECK_INTERVAL) {
         return;
     }
     lastSensorCheckTime = currentTime;
     
-    IMUData imuData = sensors.getIMUData();
-    LineData lineData = sensors.getLineData();
-    
-    if (!imuData.isValid || !imuData.isRecent(2000)) {
-        LOG_WARNING("SENSOR", "Données IMU invalides ou obsolètes");
-        systemStatus.isError = true;
-        systemStatus.lastError = ERROR_IMU_DATA;
-    } else if (!imuData.hasValidRange()) {
-        LOG_WARNING("SENSOR", "Valeurs IMU hors limites: roll=%.1f, pitch=%.1f, yaw=%.1f",
-                   imuData.roll, imuData.pitch, imuData.yaw);
-    }
-    
-    if (!lineData.isTensionValid || !lineData.isRecent(2000)) {
-        LOG_WARNING("SENSOR", "Données de tension invalides ou obsolètes");
-    } else if (!lineData.isTensionSafe(MAX_SAFE_TENSION)) {
-        LOG_WARNING("SENSOR", "Tension excessive: %.1f N", lineData.tension);
-    }
-    
-    ServoState servoState = servos.getState();
-    if (!servoState.isDirectionInLimits() || !servoState.isTrimInLimits()) {
-        LOG_WARNING("SERVO", "Angles servos hors limites: dir=%.1f, trim=%.1f",
-                   servoState.directionAngle, servoState.trimAngle);
-    }
+    verifierEtatDeLImu();
+    verifierEtatDeLaTension();
+    verifierEtatDesServos();
 }
 
 // Envoie un "heartbeat" périodique aux logs pour confirmer que le système fonctionne
 void envoyerHeartbeat() {
+    static unsigned long lastHeartbeatTime = 0;
     unsigned long currentTime = millis();
     if (currentTime - lastHeartbeatTime < HEARTBEAT_INTERVAL) {
         return;
     }
     lastHeartbeatTime = currentTime;
     
-    systemStatus.uptime = currentTime;
-    systemStatus.cpuTemperature = 45.0f + (random(0, 100) / 100.0f);
-    
-    char uptimeStr[16];
-    systemStatus.getUptimeString(uptimeStr, sizeof(uptimeStr));
-    
-    LOG_INFO("SYSTEM", "Heartbeat - Uptime: %s, Free: %d KB, Temp: %.1f°C",
-             uptimeStr, systemStatus.freeMemory / 1024, systemStatus.cpuTemperature);
+    mettreAJourEtatDuSysteme();
+    afficherHeartbeat();
 }
 
 // Affichage périodique des informations sur l'écran LCD
 void mettreAJourAffichage(uint8_t screen = 1) {
-    LcdModule& lcdTarget = getLcd(screen);
+    static unsigned long lastDisplayUpdateTime = 0;
     unsigned long currentTime = millis();
     if (currentTime - lastDisplayUpdateTime < DISPLAY_UPDATE_INTERVAL) {
         return;
     }
     lastDisplayUpdateTime = currentTime;
-    IMUData imuData = sensors.getIMUData();
-    LineData lineData = sensors.getLineData();
-    WindData windData = sensors.getWindData();
-    AutopilotStatus autopilotStatus = autopilot.getStatus();
-    if (screen == 1) {
-        lcdTarget.showSystemScreen(
-            autopilotStatus.statusMessage,
-            imuData.roll,
-            imuData.pitch,
-            lineData.tension,
-            autopilotStatus.powerGenerated
-        );
-        if (autopilotStatus.mode == AUTOPILOT_LAUNCH || autopilotStatus.mode == AUTOPILOT_LAND) {
-            lcdTarget.showProgressBar(3, autopilotStatus.completionPercent);
-        }
-        if (systemStatus.isError) {
-            if ((currentTime / 10000) % 2 == 0) {
-                snprintf(messageBuffer, sizeof(messageBuffer), "ERR#%d", systemStatus.lastError);
-                lcdTarget.print(messageBuffer, 16, 0);
-            }
-        }
-    } else if (screen == 2) {
-        char buffer[21];
-        snprintf(buffer, sizeof(buffer), "WindDir: %5.1f deg", windData.direction);
-        lcdTarget.print(buffer, 0, 0);
-        snprintf(buffer, sizeof(buffer), "WindSpd: %5.1f m/s", windData.speed);
-        lcdTarget.print(buffer, 0, 1);
-        snprintf(buffer, sizeof(buffer), "Tension: %5.1f N", lineData.tension);
-        lcdTarget.print(buffer, 0, 2);
-    }
+    
+    afficherInformationsSurLEcran(screen);
 }
 
 // Fonction d'initialisation du système
-bool initialiserSysteme() {
-    bool success = true;
-    
-    Serial.begin(SERIAL_BAUD_RATE);
-    Serial.println("\n\n=== Démarrage du système Kite Pilote ===");
-    Serial.println("Version " VERSION_STRING " - " BUILD_DATE);
-    
-    Logger::begin(LL_INFO);
-    LOG_INFO("MAIN", "Initialisation du système...");
-    
+bool initialiserLEDs() {
     if (!ledStatus.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation de la LED de statut");
-        success = false;
+        return false;
     }
-    
     if (!ledError.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation de la LED d'erreur");
-        success = false;
+        return false;
     }
-    
+    return true;
+}
+
+bool initialiserLCD() {
     if (!lcd.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation de l'écran LCD");
         ledError.setPattern(LED_PATTERN_ON);
-        success = false;
+        return false;
     }
-    
     if (!lcd2.begin()) {
         LOG_WARNING("MAIN", "Deuxième écran LCD non détecté, désactivé");
     }
-    
+    return true;
+}
+
+bool initialiserCapteurs() {
     if (!sensors.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation des capteurs");
         ledError.setPattern(LED_PATTERN_ON);
         lcd.print("Erreur capteurs", 0, 2);
-        success = false;
+        return false;
     }
-    
+    return true;
+}
+
+bool initialiserServos() {
     if (!servos.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation des servomoteurs");
         ledError.setPattern(LED_PATTERN_ON);
         lcd.print("Erreur servos", 0, 2);
-        success = false;
+        return false;
     }
-    
+    return true;
+}
+
+bool initialiserAutopilot() {
     if (!autopilot.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation de l'autopilote");
         ledError.setPattern(LED_PATTERN_ON);
-        lcd.print("Erreur autopilote", 0, 2);
-        success = false;
+        return false;
     }
-    
-    #ifdef SIMULATION_MODE
+    return true;
+}
+
+#ifdef SIMULATION_MODE
+bool initialiserSimulation() {
     if (!simulation.begin()) {
         LOG_ERROR("MAIN", "Échec d'initialisation de la simulation");
         ledError.setPattern(LED_PATTERN_ON);
         lcd.print("Erreur simulation", 0, 2);
-        success = false;
+        return false;
     }
-    #endif
-    
-    #if defined(WIFI_ENABLED) && WIFI_ENABLED
+    return true;
+}
+#endif
+
+#if defined(WIFI_ENABLED) && WIFI_ENABLED
+bool initialiserWiFi() {
     ledStatus.setPattern(LED_PATTERN_WIFI_CONNECTING);
     LOG_INFO("WIFI", "Connexion au SSID: %s", WIFI_SSID);
     #ifdef SIMULATION_MODE
@@ -313,15 +255,17 @@ bool initialiserSysteme() {
     if (WiFi.status() == WL_CONNECTED) {
         LOG_INFO("WIFI", "Connecté, IP: %s", WiFi.localIP().toString().c_str());
         ledStatus.setPattern(LED_PATTERN_WIFI_CONNECTED);
+        return true;
     } else {
-        LOG_ERROR("WIFI", "Échec de connexion WiFi");
+        LOG_ERROR("MAIN", "Échec de connexion WiFi");
         ledError.setPattern(LED_PATTERN_ERROR);
-        success = false;
+        return false;
     }
-    #endif
+}
+#endif
 
-    // Initialiser l'interface web (après le WiFi)
-    #if defined(WIFI_ENABLED) && WIFI_ENABLED
+#if defined(WIFI_ENABLED) && WIFI_ENABLED
+bool initialiserWebInterface() {
     if (!webInterface.begin(WiFi.getMode() == WIFI_AP)) {
         LOG_ERROR("MAIN", "Échec d'initialisation de l'interface web");
         // Ne pas marquer comme échec critique pour l'instant
@@ -331,9 +275,13 @@ bool initialiserSysteme() {
         webInterface.setModeChangeCallback(handleModeChange);
         webInterface.setDirectionChangeCallback(handleDirectionChange);
         webInterface.setEmergencyCallback(handleEmergencyStop);
+        return true;
     }
-    #endif
-    
+    return false;
+}
+#endif
+
+bool initialiserTFT() {
     tft.begin();
     tft.setRotation(1);
     tft.fillScreen(ILI9341_BLACK);
@@ -344,6 +292,39 @@ bool initialiserSysteme() {
     } else {
         Serial.println("Tactile FT6206 prêt.");
     }
+    return true;
+}
+
+bool initialiserSysteme() {
+    bool success = true;
+    
+    Serial.begin(SERIAL_BAUD_RATE);
+    Serial.println("\n\n=== Démarrage du système Kite Pilote ===");
+    Serial.println("Version " VERSION_STRING " - " BUILD_DATE);
+    
+    Logger::begin(LL_INFO);
+    LOG_INFO("MAIN", "Initialisation du système...");
+    
+    success &= initialiserLEDs();
+    success &= initialiserLCD();
+    success &= initialiserCapteurs();
+    success &= initialiserServos();
+    success &= initialiserAutopilot();
+    
+    #ifdef SIMULATION_MODE
+    success &= initialiserSimulation();
+    #endif
+    
+    #if defined(WIFI_ENABLED) && WIFI_ENABLED
+    success &= initialiserWiFi();
+    #endif
+
+    // Initialiser l'interface web (après le WiFi)
+    #if defined(WIFI_ENABLED) && WIFI_ENABLED
+    success &= initialiserWebInterface();
+    #endif
+    
+    success &= initialiserTFT();
     
     esp_task_wdt_init(10, true);
     esp_task_wdt_add(NULL);
@@ -379,7 +360,7 @@ void simulateKite() {
 // FONCTIONS PRINCIPALES ARDUINO
 //=============================================================================
 
-void setup() {
+void demarrer() {
     if (!initialiserSysteme()) {
         while (true) {
             ledError.update();
@@ -392,11 +373,11 @@ void setup() {
     lcd.print("Systeme pret", 0, 1);
     lcd.print("Mode: Attente", 0, 2);
     
-    vCreateTasks();
+    creerLesTaches();
     vTaskDelete(NULL);
 }
 
-void loop() {
+void bouclePrincipale() {
     // Mettre à jour l'interface web (pour DNS/Captive Portal)
     #if defined(WIFI_ENABLED) && WIFI_ENABLED
     webInterface.update();

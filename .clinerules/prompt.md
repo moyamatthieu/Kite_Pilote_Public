@@ -1,6 +1,8 @@
 # Guide de documentation des modifications – Kite Pilote
 - Parle en français
+-si possible utilise des nom de fonction en français
 - Documenter toute modification, même mineure, dans le changelog.
+- mettre a jour le nuemro de version dans config.h
 - Utiliser un format standard : date, heure, titre bref, liste des changements, impact et fichiers concernés.
 - Organiser le changelog par version, puis par date (ordre antéchronologique).
 - Expliquer le pourquoi de chaque modification, pas seulement le quoi.

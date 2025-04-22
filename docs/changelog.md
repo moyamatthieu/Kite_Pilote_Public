@@ -3,6 +3,86 @@
 Ce fichier sert de journal détaillé de toutes les modifications apportées au projet Kite Pilote.
 Chaque entrée est horodatée avec précision, permettant de suivre l'évolution du projet.
 
+## 2025-04-22
+
+### 21:37:00 - Refactorisation de la fonction mettreAJourAffichage()
+
+- **Catégorie**: Refactorisation
+- **Action**: Division de la fonction `mettreAJourAffichage()` dans `src/main.cpp` en fonctions plus petites pour afficher les informations sur l'écran LCD.
+- **Fichiers concernés**: `src/main.cpp`
+- **Impact**: Amélioration de la lisibilité et de la maintenabilité du code.
+- **Pourquoi**: La fonction `mettreAJourAffichage()` était trop longue et difficile à comprendre. La division en fonctions plus petites permet de mieux organiser le code et de faciliter la maintenance.
+
+## 2025-04-22
+
+### 21:37:00 - Refactorisation de la fonction envoyerHeartbeat()
+
+- **Catégorie**: Refactorisation
+- **Action**: Division de la fonction `envoyerHeartbeat()` dans `src/main.cpp` en fonctions plus petites pour mettre à jour l'état du système, lire la température du CPU et afficher le heartbeat.
+- **Fichiers concernés**: `src/main.cpp`
+- **Impact**: Amélioration de la lisibilité et de la maintenabilité du code.
+- **Pourquoi**: La fonction `envoyerHeartbeat()` était trop longue et difficile à comprendre. La division en fonctions plus petites permet de mieux organiser le code et de faciliter la maintenance.
+
+## 2025-04-22
+
+### 21:36:00 - Amélioration de la gestion des erreurs et refactorisation de verifierCapteurs()
+
+- **Catégorie**: Refactorisation, Amélioration
+- **Action**: Division de la fonction `verifierCapteurs()` dans `src/main.cpp` en fonctions plus petites pour vérifier l'état de l'IMU, de la tension et des servos. Ajout d'une fonction `gererErreurCapteur()` pour gérer les erreurs de capteurs.
+- **Fichiers concernés**: `src/main.cpp`
+- **Impact**: Amélioration de la lisibilité et de la maintenabilité du code. Meilleure gestion des erreurs de capteurs.
+- **Pourquoi**: La fonction `verifierCapteurs()` était trop longue et difficile à comprendre. La division en fonctions plus petites permet de mieux organiser le code et de faciliter la maintenance.
+
+## 2025-04-22
+
+### 21:32:00 - Refactorisation de la fonction initialiserSysteme()
+
+- **Catégorie**: Refactorisation
+- **Action**: Division de la fonction `initialiserSysteme()` dans `src/main.cpp` en fonctions plus petites pour chaque module (par exemple, `initialiserLEDs()`, `initialiserLCD()`, `initialiserCapteurs()`, etc.).
+- **Fichiers concernés**: `src/main.cpp`
+- **Impact**: Amélioration de la lisibilité et de la maintenabilité du code.
+- **Pourquoi**: La fonction `initialiserSysteme()` était trop longue et difficile à comprendre. La division en fonctions plus petites permet de mieux organiser le code et de faciliter la maintenance.
+
+## 2025-04-22
+
+### 21:27:00 - Résolution du conflit de port 8180
+
+- **Catégorie**: Bugfix
+- **Action**: Identification et arrêt du processus (PID 726, "node") utilisant le port 8180, afin de permettre à Wokwi de configurer le port forwarding.
+- **Impact**: Résolution du problème de port forwarding, permettant à Wokwi d'utiliser le port 8180.
+- **Pourquoi**: Un autre processus utilisait déjà le port 8180, empêchant Wokwi de l'utiliser.
+
+## 2025-04-22
+
+### 21:24:00 - Exécution du script data_to_littlefs.py
+
+- **Catégorie**: Configuration
+- **Action**: Exécution du script `data_to_littlefs.py` pour automatiser la configuration de LittleFS dans `wokwi.toml`.
+- **Fichiers concernés**: `wokwi.toml`, `data_to_littlefs.py`
+- **Impact**: Mise à jour automatique de la section `[wokwi.littlefs]` dans `wokwi.toml` en fonction des fichiers présents dans le dossier `data`.
+- **Pourquoi**: Automatisation de la configuration de LittleFS pour Wokwi, facilitant la gestion des fichiers inclus dans la simulation.
+
+## 2025-04-22
+
+### 21:22:00 - Correction de la syntaxe du fichier wokwi.toml
+
+- **Catégorie**: Bugfix, Configuration
+- **Correction**: Correction de la syntaxe incorrecte dans la section `[wokwi.littlefs]` du fichier `wokwi.toml`.
+- **Fichiers concernés**: `wokwi.toml`
+- **Impact**: Résolution de l'erreur de parsing du fichier `wokwi.toml`, permettant à la simulation Wokwi de fonctionner correctement.
+- **Pourquoi**: La syntaxe incorrecte empêchait Wokwi de charger correctement la configuration du système de fichiers LittleFS.
+
+## 2025-04-22
+
+### 21:17:00 - Correction erreur de compilation LcdModule
+
+- **Catégorie**: Bugfix
+- **Correction**: Modification de l'instanciation des objets `LcdModule` dans `main.cpp` pour utiliser le constructeur par défaut, suite à la suppression du constructeur paramétré dans `lcd_module.h`.
+- **Fichiers concernés**: `src/main.cpp`
+- **Impact**: Résolution de l'erreur de compilation empêchant le build du projet. Le système peut de nouveau être compilé avec succès.
+- **Pourquoi**: Le constructeur utilisé dans `main.cpp` n'existait plus dans la définition de la classe `LcdModule`, provoquant une erreur de compilation bloquante. La correction aligne l'utilisation de la classe avec sa définition actuelle.
+
+
 ## 2025-04-21
 
 ### 10:15:00 - Optimisation et correction des problèmes de compilation
