@@ -15,23 +15,26 @@
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_FT6206.h>
+#include <WiFi.h>
 
 // Inclusions des modules de base
 #include "core/config.h"
 #include "core/data_types.h"
 #include "utils/logger.h"
 
+#ifdef SIMULATION_MODE
+#include "modules/simulation_module.h"
+SimulationModule simulation;
+#endif
+
 // Inclusions des modules fonctionnels
 #include "modules/led_module.h"
 #include "modules/lcd_module.h"
-#include "modules/sensor_module.h"
-#include "modules/servo_module.h"
 #include "modules/autopilot_module.h"
+#include "core/tasks.h" // Gestion multitâche
 
-// Module de simulation pour les tests sans matériel
-#ifdef SIMULATION_MODE
-#include "modules/simulation_module.h"
-#endif
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 //=============================================================================
 // INSTANCES GLOBALES DES MODULES
@@ -58,11 +61,6 @@ ServoModule servos;
 
 // Gestionnaire de l'autopilote
 AutopilotModule autopilot;
-
-// Module de simulation (actif uniquement en mode simulation)
-#ifdef SIMULATION_MODE
-SimulationModule simulation;
-#endif
 
 // Gestionnaire de l'écran TFT et du tactile
 #define TFT_CS   15
@@ -189,21 +187,15 @@ void sendHeartbeat() {
 // Affichage périodique des informations sur l'écran LCD
 void updateDisplay(uint8_t screen = 1) {
     LcdModule& lcdTarget = getLcd(screen);
-    // Limiter les mises à jour pour ne pas surcharger l'écran
     unsigned long currentTime = millis();
     if (currentTime - lastDisplayUpdateTime < DISPLAY_UPDATE_INTERVAL) {
         return;
     }
     lastDisplayUpdateTime = currentTime;
-    
-    // Récupérer les données des capteurs
     IMUData imuData = sensors.getIMUData();
     LineData lineData = sensors.getLineData();
     WindData windData = sensors.getWindData();
-    
-    // Récupérer les données de l'autopilote
     AutopilotStatus autopilotStatus = autopilot.getStatus();
-    
     if (screen == 1) {
         lcdTarget.showSystemScreen(
             autopilotStatus.statusMessage,
@@ -212,15 +204,10 @@ void updateDisplay(uint8_t screen = 1) {
             lineData.tension,
             autopilotStatus.powerGenerated
         );
-        
-        // Afficher une barre de progression pour les séquences de décollage/atterrissage
         if (autopilotStatus.mode == AUTOPILOT_LAUNCH || autopilotStatus.mode == AUTOPILOT_LAND) {
             lcdTarget.showProgressBar(3, autopilotStatus.completionPercent);
         }
-        
-        // Afficher l'état d'erreur si présent
         if (systemStatus.isError) {
-            // Afficher le code d'erreur toutes les 10 secondes
             if ((currentTime / 10000) % 2 == 0) {
                 snprintf(messageBuffer, sizeof(messageBuffer), "ERR#%d", systemStatus.lastError);
                 lcdTarget.print(messageBuffer, 16, 0);
@@ -269,9 +256,9 @@ bool initializeSystem() {
     }
     
     if (!lcd2.begin()) {
-        LOG_ERROR("MAIN", "Échec d'initialisation du deuxième écran LCD");
-        ledError.setPattern(LED_PATTERN_ON);
-        success = false;
+        // Si le deuxième LCD n'est pas présent, on ne bloque pas l'initialisation
+        LOG_WARNING("MAIN", "Deuxième écran LCD non détecté, désactivé");
+        // Pas de success = false pour ne pas arrêter le système
     }
     
     // Initialiser les capteurs
@@ -307,7 +294,31 @@ bool initializeSystem() {
         success = false;
     }
     #endif
-    
+
+    // Connexion WiFi si activé
+    #if defined(WIFI_ENABLED) && WIFI_ENABLED
+    ledStatus.setPattern(LED_PATTERN_WIFI_CONNECTING);
+    LOG_INFO("WIFI", "Connexion au SSID: %s", WIFI_SSID);
+    #ifdef SIMULATION_MODE
+    WiFi.begin(WIFI_SSID, WIFI_PASS, 6);  // Simulation Wokwi sur le canal 6
+    #else
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    #endif
+    unsigned long wifiStart = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - wifiStart < 10000) {
+        delay(500);
+        LOG_DEBUG("WIFI", "En attente de la connexion WiFi...");
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        LOG_INFO("WIFI", "Connecté, IP: %s", WiFi.localIP().toString().c_str());
+        ledStatus.setPattern(LED_PATTERN_WIFI_CONNECTED);
+    } else {
+        LOG_ERROR("WIFI", "Échec de connexion WiFi");
+        ledError.setPattern(LED_PATTERN_ERROR);
+        success = false;
+    }
+    #endif
+
     // Initialiser l'écran TFT
     tft.begin();
     tft.setRotation(1);
@@ -345,6 +356,14 @@ bool initializeSystem() {
     return success;
 }
 
+void simulateKite() {
+    #ifdef SIMULATION_MODE
+    // Code spécifique à la simulation du cerf-volant
+    simulation.updateSensors(sensors);
+    simulation.handleButtons(autopilot, servos);
+    #endif
+}
+
 //=============================================================================
 // FONCTIONS PRINCIPALES ARDUINO
 //=============================================================================
@@ -352,83 +371,26 @@ bool initializeSystem() {
 void setup() {
     // Initialiser le système complet
     if (!initializeSystem()) {
-        // Si l'initialisation échoue, on entre dans une boucle d'erreur
         while (true) {
             ledError.update();
             delay(100);
         }
     }
-    
-    // Définir le mode initial de l'autopilote
     autopilot.setMode(AUTOPILOT_STANDBY);
-    
-    // Afficher l'écran initial
     lcd.clear();
     lcd.print("Kite Pilote v" VERSION_STRING, 0, 0);
     lcd.print("Systeme pret", 0, 1);
     lcd.print("Mode: Attente", 0, 2);
-    
-    LOG_INFO("MAIN", "Système prêt, entrée dans la boucle principale");
+
+    // Créer et lancer les tâches FreeRTOS
+    vCreateTasks();
+    // Supprimer la tâche setup()-loop() Arduino
+    vTaskDelete(NULL);
 }
 
 void loop() {
-    // Mise à jour du watchdog
-    esp_task_wdt_reset();
-    
-    // Mise à jour des LEDs
-    ledStatus.update();
-    ledError.update();
-    
-    // Vérifications périodiques de santé du système
-    checkMemory();
-    checkSensors();
-    sendHeartbeat();
-    
-    // En mode simulation, mettre à jour les capteurs virtuels
-    #ifdef SIMULATION_MODE
-    simulation.updateSensors(sensors);
-    simulation.handleButtons(autopilot, servos);
-    #endif
-    
-    // Mise à jour des capteurs (en mode réel seulement si pas en simulation)
-    sensors.update();
-    
-    // Mise à jour de l'autopilote avec les données capteurs
-    autopilot.update(sensors.getIMUData(), sensors.getLineData(), sensors.getWindData());
-    
-    // Appliquer les commandes de l'autopilote aux servomoteurs
-    if (autopilot.getMode() != AUTOPILOT_OFF) {
-        servos.setDirectionAngle(autopilot.getTargetDirectionAngle());
-        servos.setTrimAngle(autopilot.getTargetTrimAngle());
-        servos.setWinchMode(autopilot.getTargetWinchMode());
-        
-        if (autopilot.getTargetWinchMode() == WINCH_MODE_GENERATOR) {
-            servos.setWinchPower(autopilot.getTargetWinchPower());
-        }
-    }
-    
-    // Mise à jour des servomoteurs (animations, séquences)
-    servos.update();
-    
-    // Mise à jour de l'affichage LCD
-    updateDisplay(1); // Affichage sur le LCD principal
-    updateDisplay(2); // Affichage sur le second LCD
-    
-    // Affichage d'exemple sur le TFT
-    tft.setCursor(10, 10);
-    tft.setTextColor(ILI9341_YELLOW);
-    tft.setTextSize(2);
-    tft.print("Kite Pilote TFT");
-    
-    // Lecture tactile
-    if (ctp.touched()) {
-        TS_Point p = ctp.getPoint();
-        tft.fillCircle(p.x, p.y, 5, ILI9341_RED);
-    }
-    
-    // Mise à jour du statut système
-    systemStatus.uptime = millis();
-    
-    // Petite pause pour réduire l'utilisation du CPU
-    delay(50);
+    // Toutes les opérations sont gérées par les tâches FreeRTOS
+    // En mode simulation, nous pouvons mettre à jour la simulation ici
+    simulateKite();
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }

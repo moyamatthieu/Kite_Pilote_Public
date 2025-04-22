@@ -54,14 +54,14 @@ public:
     
     // Initialisation du logger avec options avancées
     static void begin(LogLevel level = static_cast<LogLevel>(LL_INFO), bool printToSerial = true) {
-        _logLevel = level;
-        _bufferIndex = 0;
-        _bufferFull = false;
-        memset(_logBuffer, 0, sizeof(_logBuffer));
+        _logLevel() = level;
+        _bufferIndex() = 0;
+        _bufferFull() = false;
+        memset(_logBuffer(), 0, sizeof(LogEntry) * BUFFER_SIZE);
         
-        _printToSerial = printToSerial;
+        _printToSerial() = printToSerial;
         
-        if (_printToSerial) {
+        if (_printToSerial()) {
             Serial.println(F("=== Système de journalisation initialisé ==="));
             Serial.print(F("Niveau de log: "));
             Serial.println(logLevelToString(level));
@@ -73,42 +73,42 @@ public:
     
     // Définir le niveau de journalisation
     static void setLogLevel(LogLevel level) {
-        _logLevel = level;
+        _logLevel() = level;
         info("LOGGER", "Niveau de journalisation défini à %s", logLevelToString(level));
     }
     
     // Obtenir le niveau actuel de journalisation
     static LogLevel getLogLevel() {
-        return _logLevel;
+        return _logLevel();
     }
     
     // Fonctions de journalisation pour différents niveaux
     static void error(const char* module, const char* message) {
-        if (_logLevel >= static_cast<LogLevel>(LL_ERROR)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_ERROR)) {
             log(static_cast<LogLevel>(LL_ERROR), module, message);
         }
     }
     
     static void warning(const char* module, const char* message) {
-        if (_logLevel >= static_cast<LogLevel>(LL_WARNING)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_WARNING)) {
             log(static_cast<LogLevel>(LL_WARNING), module, message);
         }
     }
     
     static void info(const char* module, const char* message) {
-        if (_logLevel >= static_cast<LogLevel>(LL_INFO)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_INFO)) {
             log(static_cast<LogLevel>(LL_INFO), module, message);
         }
     }
     
     static void debug(const char* module, const char* message) {
-        if (_logLevel >= static_cast<LogLevel>(LL_DEBUG)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_DEBUG)) {
             log(static_cast<LogLevel>(LL_DEBUG), module, message);
         }
     }
     
     static void verbose(const char* module, const char* message) {
-        if (_logLevel >= static_cast<LogLevel>(LL_VERBOSE)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_VERBOSE)) {
             log(static_cast<LogLevel>(LL_VERBOSE), module, message);
         }
     }
@@ -116,42 +116,42 @@ public:
     // Fonctions avec formatage (comme printf)
     template<typename... Args>
     static void error(const char* module, const char* format, Args... args) {
-        if (_logLevel >= static_cast<LogLevel>(LL_ERROR)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_ERROR)) {
             formatAndLog(static_cast<LogLevel>(LL_ERROR), module, format, args...);
         }
     }
     
     template<typename... Args>
     static void warning(const char* module, const char* format, Args... args) {
-        if (_logLevel >= static_cast<LogLevel>(LL_WARNING)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_WARNING)) {
             formatAndLog(static_cast<LogLevel>(LL_WARNING), module, format, args...);
         }
     }
     
     template<typename... Args>
     static void info(const char* module, const char* format, Args... args) {
-        if (_logLevel >= static_cast<LogLevel>(LL_INFO)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_INFO)) {
             formatAndLog(static_cast<LogLevel>(LL_INFO), module, format, args...);
         }
     }
     
     template<typename... Args>
     static void debug(const char* module, const char* format, Args... args) {
-        if (_logLevel >= static_cast<LogLevel>(LL_DEBUG)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_DEBUG)) {
             formatAndLog(static_cast<LogLevel>(LL_DEBUG), module, format, args...);
         }
     }
     
     template<typename... Args>
     static void verbose(const char* module, const char* format, Args... args) {
-        if (_logLevel >= static_cast<LogLevel>(LL_VERBOSE)) {
+        if (_logLevel() >= static_cast<LogLevel>(LL_VERBOSE)) {
             formatAndLog(static_cast<LogLevel>(LL_VERBOSE), module, format, args...);
         }
     }
     
     // Obtenir le nombre total d'entrées de log dans le buffer
     static uint16_t getLogCount() {
-        return _bufferFull ? BUFFER_SIZE : _bufferIndex;
+        return _bufferFull() ? BUFFER_SIZE : _bufferIndex();
     }
     
     // Obtenir une entrée de log spécifique par index
@@ -161,15 +161,15 @@ public:
         }
         
         uint16_t actualIndex;
-        if (_bufferFull) {
+        if (_bufferFull()) {
             // Buffer circulaire rempli, calculer l'index réel
-            actualIndex = (_bufferIndex + index) % BUFFER_SIZE;
+            actualIndex = (_bufferIndex() + index) % BUFFER_SIZE;
         } else {
             // Buffer pas encore rempli
             actualIndex = index;
         }
         
-        return &_logBuffer[actualIndex];
+        return &_logBuffer()[actualIndex];
     }
     
     // Exporter les logs vers la console série
@@ -196,11 +196,10 @@ public:
     }
     
     // Vider le buffer de logs
-    // Vider le buffer de logs
     static void clearLogs() {
-        _bufferIndex = 0;
-        _bufferFull = false;
-        memset(_logBuffer, 0, sizeof(_logBuffer));
+        _bufferIndex() = 0;
+        _bufferFull() = false;
+        memset(_logBuffer(), 0, sizeof(LogEntry) * BUFFER_SIZE);
         info("LOGGER", "Buffer de logs vidé");
     }
     
@@ -231,22 +230,49 @@ public:
     
     // Activer/désactiver l'affichage sur le port série
     static void setPrintToSerial(bool enabled) {
-        _printToSerial = enabled;
+        _printToSerial() = enabled;
     }
     
 private:
-    static LogLevel _logLevel;
-    static LogEntry _logBuffer[BUFFER_SIZE];
-    static uint16_t _bufferIndex;
-    static bool _bufferFull;
-    static bool _printToSerial;
+    // Utilisation d'une approche "inline singleton" pour éviter les définitions multiples
+    static LogLevel& _getLogLevel() {
+        static LogLevel level = LL_INFO;
+        return level;
+    }
+    
+    static LogEntry* _getLogBuffer() {
+        static LogEntry buffer[BUFFER_SIZE];
+        return buffer;
+    }
+    
+    static uint16_t& _getBufferIndex() {
+        static uint16_t index = 0;
+        return index;
+    }
+    
+    static bool& _getBufferFull() {
+        static bool full = false;
+        return full;
+    }
+    
+    static bool& _getPrintToSerial() {
+        static bool print = true;
+        return print;
+    }
+    
+    // Accesseurs pour les variables statiques
+    static LogLevel& _logLevel() { return _getLogLevel(); }
+    static LogEntry* _logBuffer() { return _getLogBuffer(); }
+    static uint16_t& _bufferIndex() { return _getBufferIndex(); }
+    static bool& _bufferFull() { return _getBufferFull(); }
+    static bool& _printToSerial() { return _getPrintToSerial(); }
     
     // Fonction interne d'affichage et stockage
     static void log(LogLevel level, const char* module, const char* message) {
         uint32_t timestamp = millis();
         
         // Stocker dans le buffer circulaire
-        LogEntry& entry = _logBuffer[_bufferIndex];
+        LogEntry& entry = _logBuffer()[_bufferIndex()];
         entry.timestamp = timestamp;
         entry.level = level;
         
@@ -259,13 +285,13 @@ private:
         entry.message[sizeof(entry.message) - 1] = '\0';
         
         // Avancer dans le buffer circulaire
-        _bufferIndex = (_bufferIndex + 1) % BUFFER_SIZE;
-        if (_bufferIndex == 0) {
-            _bufferFull = true;
+        _bufferIndex() = (_bufferIndex() + 1) % BUFFER_SIZE;
+        if (_bufferIndex() == 0) {
+            _bufferFull() = true;
         }
         
         // Afficher sur la console série pour ERROR et WARNING ou si on est en mode debugging
-        if (_printToSerial && (level <= LL_WARNING || _logLevel >= LL_DEBUG)) {
+        if (_printToSerial() && (level <= LL_WARNING || _logLevel() >= LL_DEBUG)) {
             printLogEntry(entry);
         }
     }
@@ -303,12 +329,8 @@ private:
     }
 };
 
-// Initialisation des variables statiques
-LogLevel Logger::_logLevel = static_cast<LogLevel>(LL_INFO);
-LogEntry Logger::_logBuffer[Logger::BUFFER_SIZE];
-uint16_t Logger::_bufferIndex = 0;
-bool Logger::_bufferFull = false;
-bool Logger::_printToSerial = true;
+// Les variables statiques sont maintenant initialisées dans leurs fonctions d'accès respectives
+// Aucune initialisation supplémentaire n'est nécessaire ici
 
 // Macros pour faciliter l'utilisation
 #define LOG_ERROR(module, ...) Logger::error(module, __VA_ARGS__)

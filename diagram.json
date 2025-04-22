@@ -146,8 +146,8 @@
     {
       "type": "board-ili9341-cap-touch",
       "id": "lcd1",
-      "top": 192.76,
-      "left": 374.02,
+      "top": 269.56,
+      "left": 326.02,
       "attrs": {}
     },
     { "type": "wokwi-ft6206", "id": "touch", "top": 400, "left": 650, "attrs": {} }

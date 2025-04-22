@@ -1,12 +1,18 @@
 # Projet Kite Pilote
 
-## Version: 2.0.0.0 — Dernière mise à jour: 19 Avril 2025
+## Version: 2.0.0.1 — Dernière mise à jour: 21 Avril 2025
 
 ## Présentation du projet
 
 Le projet Kite Pilote est un système de contrôle automatique pour cerf-volant générateur d'électricité. Il utilise un ESP32 pour piloter un kite (cerf-volant de traction) afin de produire de l'électricité grâce aux mouvements optimisés.
 
 Cette version du code a été refactorisée pour être plus accessible aux débutants en programmation Arduino et ESP32. La structure modulaire permet de comprendre facilement le fonctionnement de chaque partie du système.
+
+### Points clés de la dernière mise à jour (21 Avril 2025)
+
+- **Optimisation du système de journalisation**: Implémentation d'une approche "inline singleton" dans logger.h pour éviter les définitions multiples
+- **Correction des warnings de compilation**: Résolution des problèmes liés aux dépendances et redéfinitions de macros
+- **Amélioration de la documentation**: Mise à jour du changelog et des README
 
 ### Concept technique
 
@@ -42,7 +48,7 @@ kite_pilote/
 │   ├── interfaces/           # Interfaces utilisateur (structure prête pour extension)
 │   └── utils/                # Utilitaires
 │       ├── circular_buffer.h # Buffer circulaire pour les données
-│       └── logger.h          # Système de journalisation
+│       └── logger.h          # Système de journalisation optimisé
 ├── src/                      # Fichiers d'implémentation
 │   ├── core/                 # Implémentation des composants de base
 │   ├── modules/              # Implémentation des modules
@@ -417,6 +423,13 @@ Le système affiche des codes d'erreur sur l'écran LCD en cas de problème :
 - `ERR#5` : Erreur de communication I2C
 - `ERR#6` : Erreur de servomoteur
 
+## Pour plus d'informations
+
+Consultez le dossier `docs/` pour une documentation détaillée du projet, notamment :
+- Le changelog complet des modifications (`changelog.md`)
+- La description technique détaillée (`projet_kite_complet.md`)
+- Les guides d'utilisation et d'installation
+
 ## Licence
 
 Ce projet est distribué sous licence open source.
@@ -427,9 +440,15 @@ Projet développé par l'équipe Kite Pilote.
 
 ## Historique des versions
 
-- **v2.0.0.0** (19/04/2025) - Version actuelle
-  - Refactorisation complète du code avec architecture modulaire
-  - Ajout du mode simulation
+- **v2.0.0.1** (21/04/2025) - Version actuelle
+  - Optimisation du système de journalisation (logger.h)
+  - Correction des problèmes de compilation
+  - Amélioration de la documentation
+
+- **v2.0.0.0** (19/04/2025)
+  - Restructuration majeure de l'architecture du projet
+  - Refactorisation complète du code avec approche modulaire
+  - Ajout du mode simulation avancé
   - Amélioration des algorithmes d'autopilotage
   - Optimisation de la génération d'énergie
 

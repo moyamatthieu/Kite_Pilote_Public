@@ -44,7 +44,9 @@
 
 // Active le mode simulation pour Wokwi
 // Commentez cette ligne pour utiliser les capteurs réels
-#define SIMULATION_MODE
+#ifndef SIMULATION_MODE
+    #define SIMULATION_MODE
+#endif
 
 //===============================================================
 // SECTION 3: PARAMÈTRES DE SÉCURITÉ ET LIMITES
@@ -80,6 +82,7 @@ const uint8_t LED_RED_PIN = 17;     // Pin pour la LED rouge (erreur)
 const uint8_t LCD_I2C_ADDR = 0x27;  // Adresse I2C du LCD
 #define LCD1_I2C_ADDR 0x27          // Adresse I2C du premier écran LCD
 #define LCD2_I2C_ADDR 0x3F          // Adresse I2C du second écran LCD
+
 const uint8_t LCD_COLS = 20;        // 20 colonnes
 const uint8_t LCD_ROWS = 4;         // 4 lignes
 const uint8_t I2C_SDA_PIN = 21;     // Pin SDA pour I2C (LCD)
@@ -136,6 +139,17 @@ const unsigned long LED_BLINK_INTERVAL = 1000;  // Intervalle de clignotement (m
 #define WIFI_WEB_PORT 80                // Port du serveur web
 
 //===============================================================
+// SECTION 4 bis: IDENTIFIANTS WIFI
+//===============================================================
+#ifdef SIMULATION_MODE
+#define WIFI_SSID "Wokwi-GUEST"       // SSID utilisé par Wokwi
+#define WIFI_PASS ""                  // Pas de mot de passe en simulation
+#else
+#define WIFI_SSID "MMA33"           // SSID du réseau réel
+#define WIFI_PASS "0231966925" // Remplacez par le mot de passe réel
+#endif
+
+//===============================================================
 // SECTION 5: DÉFINITIONS D'ÉTATS ET MODES
 //===============================================================
 
@@ -190,5 +204,38 @@ enum ErrorCode {
   ERROR_WATCHDOG = 41,
   ERROR_EMERGENCY_STOP = 50
 };
+
+//===============================================================
+// SECTION X: PARAMÈTRES TASKS (FreeRTOS)
+//===============================================================
+// Tailles de pile (en mots) et priorités des tâches
+#define TASK_SENSOR_STACK      2048
+#define TASK_SENSOR_PRIORITY   5
+
+#define TASK_CONTROL_STACK     2048
+#define TASK_CONTROL_PRIORITY  5
+
+#define TASK_DISPLAY_STACK     2048
+#define TASK_DISPLAY_PRIORITY  3
+
+#define TASK_WIFI_STACK        4096
+#define TASK_WIFI_PRIORITY     4
+
+#define TASK_DIAG_STACK        2048
+#define TASK_DIAG_PRIORITY     2
+
+// Longueurs de queues
+#define QUEUE_SENSOR_LENGTH    5
+#define QUEUE_CONTROL_LENGTH   5
+
+// Bits pour EventGroup diagnostic
+#define BIT_SENSOR_OK          (1 << 0)
+#define BIT_CONTROL_OK         (1 << 1)
+#define BIT_DISPLAY_OK         (1 << 2)
+#define BIT_WIFI_OK            (1 << 3)
+#define BIT_ALL_OK             (BIT_SENSOR_OK | BIT_CONTROL_OK | BIT_DISPLAY_OK | BIT_WIFI_OK)
+
+// Timeout de diagnostic (en ms)
+#define DIAG_CHECK_INTERVAL_MS 5000
 
 #endif // CONFIG_H

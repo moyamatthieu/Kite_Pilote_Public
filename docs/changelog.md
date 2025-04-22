@@ -1,8 +1,19 @@
-<!-- filepath: /workspaces/Kite_Pilote_Public/docs/changelog.md -->
 # Journal des Modifications du Projet Kite Pilote
 
 Ce fichier sert de journal détaillé de toutes les modifications apportées au projet Kite Pilote.
 Chaque entrée est horodatée avec précision, permettant de suivre l'évolution du projet.
+
+## 2025-04-21
+
+### 10:15:00 - Optimisation et correction des problèmes de compilation
+
+- **Catégorie**: Bugfix, Configuration, Optimisation
+- **Résolution du problème des définitions multiples dans logger.h**: Mise en place d'une approche "inline singleton" pour remplacer les variables statiques traditionnelles, éliminant les erreurs de compilation liées aux définitions multiples
+- **Fichiers concernés**: `/include/utils/logger.h` - Modifications majeures de l'architecture interne du Logger
+- **Correction du warning de dépendance Adafruit FT6206**: Suppression de la référence redondante dans platformio.ini
+- **Résolution des warnings liés à SIMULATION_MODE**: Utilisation de directives conditionnelles dans config.h pour éviter les redéfinitions
+- **Impact**: Amélioration significative de la fiabilité du processus de compilation et élimination des warnings
+- **Pourquoi**: Cette modification était nécessaire pour assurer la stabilité et la maintenabilité du code à long terme, en particulier dans les projets multi-fichiers où le Logger est fréquemment utilisé
 
 ## 2025-04-19
 
