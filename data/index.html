@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kite Pilote - Interface de contrôle</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        header {
+            background-color: #1a73e8;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem;
+        }
+        .card h2 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+        .controls {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .controls h2 {
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.5rem;
+        }
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        button.emergency {
+            background-color: #dc3545;
+        }
+        button.emergency:hover {
+            background-color: #b02a37;
+        }
+        .value {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .gauge-container {
+            width: 100%;
+            height: 20px;
+            background-color: #eee;
+            border-radius: 10px;
+            margin: 0.5rem 0;
+            overflow: hidden;
+        }
+        .gauge {
+            height: 100%;
+            background-color: #1a73e8;
+            transition: width 0.5s;
+        }
+        .status-ok {
+            color: #198754;
+        }
+        .status-warning {
+            color: #fd7e14;
+        }
+        .status-error {
+            color: #dc3545;
+        }
+        .notifications {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            width: 300px;
+            z-index: 1000;
+        }
+        .notification {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            opacity: 1;
+            transition: opacity 0.5s;
+        }
+        .notification.info {
+            border-left: 4px solid #1a73e8;
+        }
+        .notification.warning {
+            border-left: 4px solid #fd7e14;
+        }
+        .notification.error {
+            border-left: 4px solid #dc3545;
+        }
+        .notification.success {
+            border-left: 4px solid #198754;
+        }
+        .notification.fade {
+            opacity: 0;
+        }
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .mode-buttons {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Kite Pilote</h1>
+        <p>Système de contrôle de cerf-volant générateur d'énergie</p>
+    </header>
+
+    <div class="container">
+        <div class="controls">
+            <h2>Contrôle du système</h2>
+            <div class="mode-buttons">
+                <button data-mode="0">Désactivé</button>
+                <button data-mode="1">Standby</button>
+                <button data-mode="2">Décollage</button>
+                <button data-mode="3">Atterrissage</button>
+                <button data-mode="4">Vol en 8</button>
+                <button data-mode="5">Vol circulaire</button>
+                <button data-mode="6">Génération</button>
+            </div>
+            <div style="text-align: center;">
+                <button class="emergency">ARRÊT D'URGENCE</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h2>Statut Système</h2>
+                <p>Temps de fonctionnement: <span id="uptime" class="value">0s</span></p>
+                <p>Batterie: <span id="battery" class="value">12.6V</span></p>
+                <p>Mémoire libre: <span id="memory" class="value">0 Ko</span></p>
+                <p>Température CPU: <span id="temp" class="value">0°C</span></p>
+            </div>
+
+            <div class="card">
+                <h2>Autopilote</h2>
+                <p>Mode actuel: <span id="mode" class="value">Inactif</span></p>
+                <p>État: <span id="status" class="value">En attente</span></p>
+                <p>Progression: <span id="completion" class="value">0%</span></p>
+                <div class="gauge-container">
+                    <div id="completion-gauge" class="gauge" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Génération d'énergie</h2>
+                <p>Puissance instantanée: <span id="power" class="value">0W</span></p>
+                <p>Énergie totale: <span id="energy" class="value">0Wh</span></p>
+            </div>
+
+            <div class="card">
+                <h2>Capteurs du kite</h2>
+                <p>Roulis: <span id="roll" class="value">0°</span></p>
+                <p>Tangage: <span id="pitch" class="value">0°</span></p>
+                <p>Lacet: <span id="yaw" class="value">0°</span></p>
+            </div>
+
+            <div class="card">
+                <h2>Conditions</h2>
+                <p>Tension ligne: <span id="tension" class="value">0N</span></p>
+                <p>Vitesse du vent: <span id="wind-speed" class="value">0m/s</span></p>
+                <p>Direction du vent: <span id="wind-dir" class="value">0°</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="notifications" class="notifications"></div>
+
+    <script>
+        // Fonction pour afficher une notification
+        function showNotification(message, type = 'info') {
+            const notifications = document.getElementById('notifications');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = message;
+            notifications.appendChild(notification);
+            
+            // Supprimer la notification après 5 secondes
+            setTimeout(() => {
+                notification.classList.add('fade');
+                setTimeout(() => {
+                    notification.remove();
+                }, 500);
+            }, 5000);
+        }
+        
+        // Fonction pour mettre à jour l'interface avec les données reçues
+        function updateUI(data) {
+            // Mise à jour du statut système
+            if (data.system) {
+                document.getElementById('uptime').textContent = `${data.system.uptime}s`;
+                document.getElementById('battery').textContent = `${data.system.battery.toFixed(1)}V`;
+                document.getElementById('memory').textContent = `${Math.round(data.system.freeMemory / 1024)}Ko`;
+                document.getElementById('temp').textContent = `${data.system.temp.toFixed(1)}°C`;
+                
+                // Afficher un avertissement si batterie faible
+                if (data.system.battery < 11.5) {
+                    document.getElementById('battery').className = 'value status-error';
+                } else if (data.system.battery < 12.0) {
+                    document.getElementById('battery').className = 'value status-warning';
+                } else {
+                    document.getElementById('battery').className = 'value status-ok';
+                }
+            }
+            
+            // Mise à jour des infos d'autopilote
+            if (data.autopilot) {
+                const modeNames = [
+                    'Désactivé', 'Standby', 'Décollage', 
+                    'Atterrissage', 'Vol en 8', 'Vol circulaire', 'Génération'
+                ];
+                document.getElementById('mode').textContent = modeNames[data.autopilot.mode] || 'Inconnu';
+                document.getElementById('status').textContent = data.autopilot.status;
+                document.getElementById('completion').textContent = `${data.autopilot.completion.toFixed(1)}%`;
+                document.getElementById('completion-gauge').style.width = `${data.autopilot.completion}%`;
+                document.getElementById('power').textContent = `${data.autopilot.power.toFixed(1)}W`;
+                document.getElementById('energy').textContent = `${data.autopilot.energy.toFixed(2)}Wh`;
+            }
+            
+            // Mise à jour des données IMU
+            if (data.imu) {
+                if (data.imu.valid) {
+                    document.getElementById('roll').textContent = `${data.imu.roll.toFixed(1)}°`;
+                    document.getElementById('pitch').textContent = `${data.imu.pitch.toFixed(1)}°`;
+                    document.getElementById('yaw').textContent = `${data.imu.yaw.toFixed(1)}°`;
+                } else {
+                    document.getElementById('roll').textContent = 'N/A';
+                    document.getElementById('pitch').textContent = 'N/A';
+                    document.getElementById('yaw').textContent = 'N/A';
+                }
+            }
+            
+            // Mise à jour des données de ligne et vent
+            if (data.line) {
+                document.getElementById('tension').textContent = `${data.line.tension.toFixed(1)}N`;
+            }
+            
+            if (data.wind) {
+                if (data.wind.valid) {
+                    document.getElementById('wind-speed').textContent = `${data.wind.speed.toFixed(1)}m/s`;
+                    document.getElementById('wind-dir').textContent = `${data.wind.direction.toFixed(0)}°`;
+                } else {
+                    document.getElementById('wind-speed').textContent = 'N/A';
+                    document.getElementById('wind-dir').textContent = 'N/A';
+                }
+            }
+        }
+        
+        // Configuration des boutons de mode
+        document.querySelectorAll('.mode-buttons button').forEach(button => {
+            button.addEventListener('click', async () => {
+                try {
+                    const mode = button.getAttribute('data-mode');
+                    const response = await fetch('/api/mode', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `mode=${mode}`
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.success) {
+                            showNotification(`Mode changé avec succès`, 'success');
+                        }
+                    } else {
+                        showNotification(`Erreur lors du changement de mode: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    showNotification(`Erreur de connexion: ${error.message}`, 'error');
+                }
+            });
+        });
+        
+        // Configuration du bouton d'urgence
+        document.querySelector('.emergency').addEventListener('click', async () => {
+            if (confirm('Êtes-vous sûr de vouloir activer l'ARRÊT D'URGENCE?')) {
+                try {
+                    const response = await fetch('/api/emergency', {
+                        method: 'POST'
+                    });
+                    
+                    if (!response.ok) {
+                        showNotification(`Erreur lors de l'arrêt d'urgence: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    showNotification(`Erreur de connexion: ${error.message}`, 'error');
+                }
+            }
+        });
+        
+        // Configuration de la connexion Server-Sent Events
+        const eventSource = new EventSource('/events');
+        
+        eventSource.addEventListener('system-update', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                updateUI(data);
+            } catch (error) {
+                console.error('Error parsing system update:', error);
+            }
+        });
+        
+        eventSource.addEventListener('notification', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                showNotification(data.message, data.type);
+            } catch (error) {
+                console.error('Error parsing notification:', error);
+            }
+        });
+        
+        eventSource.addEventListener('connection', (event) => {
+            console.log('SSE Connected:', event.data);
+            showNotification('Connecté au serveur', 'success');
+        });
+        
+        eventSource.addEventListener('error', () => {
+            console.error('SSE Connection Error');
+            showNotification('Erreur de connexion au serveur', 'error');
+        });
+        
+        // Demande initiale du statut
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Initial status:', data);
+                showNotification(`Connecté au système Kite Pilote v${data.version}`, 'info');
+            })
+            .catch(error => {
+                console.error('Error fetching initial status:', error);
+                showNotification('Impossible de récupérer le statut initial', 'error');
+            });
+    </script>
+</body>
+</html>

@@ -91,7 +91,12 @@ const uint8_t I2C_SCL_PIN = 22;     // Pin SCL pour I2C (LCD)
 // --- SERVOMOTEURS ---
 const uint8_t SERVO_DIRECTION_PIN = 23;  // Servo pour direction gauche/droite
 const uint8_t SERVO_TRIM_PIN = 27;       // Servo pour trim (angle d'incidence)
-const uint8_t SERVO_WINCH_PIN = 14;      // Servo pour treuil/générateur
+
+// --- MOTEUR PAS À PAS (STEPPER) ---
+const uint8_t STEPPER_WINCH_PIN1 = 14;   // Pin 1 pour le moteur pas à pas (IN1)
+const uint8_t STEPPER_WINCH_PIN2 = 12;   // Pin 2 pour le moteur pas à pas (IN2)
+const uint8_t STEPPER_WINCH_PIN3 = 13;   // Pin 3 pour le moteur pas à pas (IN3)
+const uint8_t STEPPER_WINCH_PIN4 = 15;   // Pin 4 pour le moteur pas à pas (IN4)
 
 // --- PINS DU MODE SIMULATION (POTENTIOMÈTRES) ---
 #ifdef SIMULATION_MODE
@@ -125,9 +130,12 @@ const float TRIM_MIN_ANGLE = -30.0;      // Angle minimum (min puissance)
 const float TRIM_MAX_ANGLE = 30.0;       // Angle maximum (max puissance)
 const float TRIM_CENTER = 0.0;           // Position centrale
 
-// Limites du servo de treuil/générateur
+// Paramètres du moteur pas à pas (stepper) pour le treuil/générateur
 const float WINCH_MIN_POWER = 0.0;       // Puissance minimale (0%)
 const float WINCH_MAX_POWER = 100.0;     // Puissance maximale (100%)
+const uint16_t STEPPER_MAX_SPEED = 1000; // Vitesse maximale en pas/seconde
+const uint8_t STEPPER_MICROSTEPS = 1;    // Mode microstepping (1, 2, 4, 8, 16, 32)
+const uint16_t STEPPER_STEPS_PER_REV = 200; // Nombre de pas par révolution (standard: 200 pour 1.8° par pas)
 
 // --- LED ---
 const unsigned long LED_BLINK_INTERVAL = 1000;  // Intervalle de clignotement (ms)

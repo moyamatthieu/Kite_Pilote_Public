@@ -7,3 +7,6 @@ elf = ".pio/build/esp32dev/firmware.elf"
 [[net.forward]]
 from = "localhost:8180"
 to = "target:80"
+
+[wokwi.littlefs]"index.html" = "data/index.html"
+"index.html" = "data/index.html"

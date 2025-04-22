@@ -1,0 +1,94 @@
+## SESSION DE TRAVAIL SUR LE PROJET KITE PILOTE - 22/04/2025
+
+### REMPLACEMENT DU SERVO WINCH PAR UN MOTEUR PAS À PAS
+
+Dans cette session, nous avons amélioré le système Kite Pilote en remplaçant le servo winch par un moteur pas à pas (stepper motor). Cette modification offre plusieurs avantages importants :
+
+1. **Meilleur contrôle de position** : Le stepper permet un positionnement précis avec une résolution de pas élevée.
+2. **Génération d'énergie plus efficace** : La capacité du moteur pas à pas à fonctionner en tant que générateur est supérieure à celle d'un servomoteur.
+3. **Maintien de position sans consommation** : En mode frein, le moteur pas à pas maintient naturellement sa position grâce à la résistance magnétique des bobines.
+4. **Rotation continue** : Contrairement au servo limité à 180°, le stepper peut faire des rotations complètes.
+
+#### Modifications effectuées dans le code :
+
+1. **Création d'une classe SimpleStepper** : Nous avons créé une classe personnalisée pour contrôler le moteur pas à pas, en remplacement de la bibliothèque Stepper standard qui n'était pas disponible dans l'environnement.
+
+2. **Adaptation du module servo** : Le fichier `servo_module.h` a été modifié pour utiliser notre classe `SimpleStepper` au lieu du `Servo` d'origine pour le winch.
+
+3. **Gestion des différents modes de fonctionnement** :
+   - `WINCH_MODE_GENERATOR` : Le moteur pas à pas offre une résistance contrôlée et récupère l'énergie
+   - `WINCH_MODE_REELING_IN` : Le moteur tourne dans le sens horaire pour enrouler
+   - `WINCH_MODE_REELING_OUT` : Le moteur tourne dans le sens anti-horaire pour dérouler
+   - `WINCH_MODE_BRAKE` : Les bobines du moteur sont maintenues sous tension pour freiner
+   - `WINCH_MODE_IDLE` : Les bobines du moteur sont désactivées pour permettre une rotation libre
+
+4. **Modification du diagramme Wokwi** : Le fichier `diagram.json` a été mis à jour pour remplacer le composant servo par un moteur pas à pas, avec les connexions électriques appropriées.
+
+### IMPLÉMENTATION DE LA MÉMOIRE SPIFFS ET INTERFACE WEB
+
+Nous avons également travaillé sur l'implémentation de la mémoire SPIFFS et l'amélioration de l'interface web pour le projet Kite Pilote.
+
+#### Défis avec SPIFFS dans Wokwi :
+
+La simulation de SPIFFS dans l'environnement Wokwi s'est avérée problématique. Malgré plusieurs tentatives :
+1. Configuration d'une partition personnalisée dans `platformio.ini`
+2. Création d'un fichier `custom_partitions.csv` définissant explicitement la partition SPIFFS
+3. Ajout du paramètre `firmwareOffset` dans le fichier `diagram.json`
+
+Nous avons constaté que Wokwi ne prend pas totalement en charge la simulation de SPIFFS de manière native, ce qui provoque l'erreur :
+```
+E (2589) SPIFFS: spiffs partition could not be found
+[  3543][E][SPIFFS.cpp:89] begin(): Mounting SPIFFS failed! Error: 261
+```
+
+#### Solution adoptée :
+
+Nous avons mis en place une approche hybride qui permet au système de fonctionner efficacement :
+
+1. **Interface web intégrée** : Nous avons implémenté une interface web complète directement dans le code via la méthode `getEmbeddedHtml()`. Cette interface est automatiquement servie lorsque SPIFFS n'est pas disponible.
+
+2. **Structure pour SPIFFS maintenue** : Le code conserve la structure permettant d'utiliser SPIFFS si disponible, ce qui assure la compatibilité avec le matériel réel où SPIFFS sera pleinement fonctionnel.
+
+3. **Interface web améliorée** : L'interface inclut :
+   - Un tableau de bord avec indicateurs en temps réel
+   - Des contrôles pour changer les modes du système
+   - Des notifications interactives
+   - Une connexion en temps réel via Server-Sent Events
+
+### CARACTÉRISTIQUES DE L'INTERFACE WEB
+
+L'interface web que nous avons développée offre les fonctionnalités suivantes :
+
+1. **Tableau de bord complet** :
+   - Statut système (temps de fonctionnement, batterie, mémoire, température)
+   - Informations d'autopilote (mode, état, progression)
+   - Données de génération d'énergie (puissance instantanée, énergie totale)
+   - Données des capteurs du kite (roulis, tangage, lacet)
+   - Conditions environnementales (tension de ligne, vent)
+
+2. **Contrôle du système** :
+   - Boutons pour changer le mode d'autopilote
+   - Bouton d'arrêt d'urgence
+   - Notifications interactives pour informer l'utilisateur
+
+3. **Communication en temps réel** :
+   - Utilisation de Server-Sent Events pour les mises à jour en temps réel
+   - API REST pour le contrôle du système
+
+### CONCLUSION ET RECOMMANDATIONS
+
+Le projet Kite Pilote a été considérablement amélioré grâce à ces modifications :
+
+1. Le remplacement du servo winch par un moteur pas à pas offre un meilleur contrôle et une génération d'énergie plus efficace.
+
+2. L'approche hybride pour l'interface web garantit que le système reste fonctionnel dans tous les environnements, y compris lors de la simulation dans Wokwi.
+
+3. L'interface web complète permet un contrôle efficace et une surveillance en temps réel du système de cerf-volant générateur d'énergie.
+
+Pour les développements futurs, nous recommandons :
+
+1. L'ajout d'un circuit de récupération d'énergie pour exploiter pleinement la capacité de génération du moteur pas à pas.
+
+2. L'amélioration de l'interface web avec des visualisations plus avancées, comme une représentation graphique de la position du kite.
+
+3. L'implémentation d'algorithmes d'autopilote plus sophistiqués pour optimiser la génération d'énergie en fonction des conditions de vent.

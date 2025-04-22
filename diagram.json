@@ -2,6 +2,7 @@
   "version": 1,
   "author": "Claude via Chat",
   "editor": "wokwi",
+  "firmwareOffset": "0x10000",
   "parts": [
     { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} },
     { "type": "wokwi-lcd2004", "id": "lcd", "top": 16, "left": 274.4, "attrs": { "pins": "i2c" } },
@@ -120,12 +121,11 @@
       "attrs": { "label": "Trim" }
     },
     {
-      "type": "wokwi-servo",
-      "id": "servo_winch",
-      "top": -356.2,
-      "left": 270.6,
-      "rotate": 270,
-      "attrs": { "label": "Winch" }
+      "type": "wokwi-stepper-motor",
+      "id": "stepper_winch",
+      "top": -418.79,
+      "left": 278.83,
+      "attrs": { "size": "17", "label": "Winch/Generator" }
     },
     {
       "type": "wokwi-pushbutton",
@@ -168,7 +168,10 @@
     [ "esp:39", "pot_wind_dir:SIG", "blue", [] ],
     [ "esp:23", "servo_direction:PWM", "orange", [ "h-148.76", "v-240", "h67" ] ],
     [ "esp:27", "servo_trim:PWM", "orange", [ "h-33.41", "v-316.8", "h211" ] ],
-    [ "esp:14", "servo_winch:PWM", "orange", [ "h-43.01", "v-316.8", "h403" ] ],
+    [ "esp:14", "stepper_winch:IN1", "orange", [ "h-43.01", "v-316.8", "h403" ] ],
+    [ "esp:12", "stepper_winch:IN2", "yellow", [ "h-53.01", "v-326.8", "h413" ] ],
+    [ "esp:13", "stepper_winch:IN3", "green", [ "h-63.01", "v-336.8", "h423" ] ],
+    [ "esp:15", "stepper_winch:IN4", "blue", [ "h-73.01", "v-346.8", "h433" ] ],
     [ "esp:4", "btn_mode:1.l", "purple", [ "h33.64", "v172.8" ] ],
     [ "esp:5", "btn_emergency:1.l", "purple", [ "h24.04", "v105.6" ] ],
     [ "led_green:C", "esp:GND", "black", [] ],
@@ -199,7 +202,11 @@
     [ "lcd:SCL", "lcd2:SCL", "green", [ "h-9.6", "v115.5" ] ],
     [ "lcd:SDA", "lcd2:SDA", "green", [ "h-19.2", "v201.8" ] ],
     [ "lcd:VCC", "lcd2:VCC", "red", [ "h-38.4", "v182.5" ] ],
-    [ "lcd:GND", "lcd2:GND", "black", [ "h-28.8", "v172.8" ] ]
+    [ "lcd:GND", "lcd2:GND", "black", [ "h-28.8", "v172.8" ] ],
+    [ "esp:14", "stepper_winch:A-", "orange", [ "h-47.85", "v-288", "h307.2" ] ],
+    [ "stepper_winch:A+", "esp:12", "gold", [ "v96", "h-422.4", "v48" ] ],
+    [ "stepper_winch:B+", "esp:13", "limegreen", [ "v105.6", "h-441.6", "v297.6" ] ],
+    [ "stepper_winch:B-", "esp:15", "blue", [ "v115.2", "h-259.21", "v297.6" ] ]
   ],
   "dependencies": {}
 }
