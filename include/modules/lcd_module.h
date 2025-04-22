@@ -34,12 +34,7 @@ public:
     static const uint8_t CHAR_ARROW = 3;    // Flèche
     
     // Adresses I2C possibles pour les écrans LCD
-    static constexpr uint8_t COMMON_LCD_ADDRESSES[4] = {
-        0x27, // Adresse la plus courante pour les modules PCF8574
-        0x3F, // Deuxième adresse la plus courante pour les modules PCF8574A
-        0x20, // Parfois utilisée sur des adaptateurs I2C modifiés
-        0x38  // Utilisée par certains fabricants
-    };
+    static const uint8_t COMMON_LCD_ADDRESSES[4];
     
     // Constructeur
     LcdModule() : 

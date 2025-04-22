@@ -40,8 +40,9 @@ public:
         _onModeChangeCallback(nullptr),
         _onDirectionChangeCallback(nullptr),
         _onEmergencyCallback(nullptr),
-        _eventId(0)
-    {}
+        _eventId(0),
+        _events("/events") // Initialize SSE endpoint
+   {}
     
     // Destructeur
     ~WebInterfaceModule() {
@@ -176,8 +177,8 @@ public:
         String jsonData;
         serializeJson(doc, jsonData);
         
-        // Envoyer à tous les clients connectés
-        _server.getEvents().send(jsonData.c_str(), "system-update", millis());
+        // Envoyer à tous les clients connectés via SSE
+        _events.send(jsonData.c_str(), "system-update", millis());
     }
     
     // Envoyer une notification aux clients connectés
@@ -192,7 +193,7 @@ public:
         String jsonData;
         serializeJson(doc, jsonData);
         
-        _server.getEvents().send(jsonData.c_str(), "notification", millis());
+        _events.send(jsonData.c_str(), "notification", millis());
     }
     
     // Vérifier si l'interface web est active
@@ -216,6 +217,7 @@ private:
     bool _apMode;                // Mode point d'accès ou client
     bool _captivePortalEnabled;  // Captive portal activé
     AsyncWebServer _server;      // Serveur web asynchrone
+    AsyncEventSource _events;    // Source pour Server-Sent Events
     DNSServer* _dnsServer;       // Serveur DNS pour captive portal
     uint32_t _eventId;           // Identifiant incrémental pour les événements SSE
     
@@ -395,11 +397,13 @@ private:
         });
         
         // Configuration des événements SSE (Server-Sent Events)
-        AsyncEventSource& events = _server.getEvents();
-        events.onConnect([](AsyncEventSourceClient *client) {
-            client->send("Connected to Kite Pilote event stream", "connection", millis());
+        _events.onConnect([](AsyncEventSourceClient *client) {
+             if(client->lastId()){
+                LOG_DEBUG("WEB", "SSE Client reconnected, last ID: %u", client->lastId());
+             }
+             client->send("Connected to Kite Pilote event stream", "connection", millis(), 10000);
         });
-        _server.addHandler(&events);
+        _server.addHandler(&_events); // Attach event source handler
         
         // Gestionnaire pour les requêtes non trouvées (404)
         _server.onNotFound([](AsyncWebServerRequest *request) {

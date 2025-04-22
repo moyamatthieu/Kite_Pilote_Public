@@ -16,7 +16,7 @@
 extern SensorModule sensors;
 extern ServoModule servos;
 extern AutopilotModule autopilot;
-extern void updateDisplay(uint8_t screen);
+extern void mettreAJourAffichage(uint8_t screen);
 
 // Handles des queues et event group
 QueueHandle_t xQueueSensorToControl = NULL;
@@ -58,8 +58,8 @@ static void vTaskDisplay(void* pvParameters) {
     SensorMessage_t msg;
     for (;;) {
         if (xQueueReceive(xQueueSensorToDisplay, &msg, portMAX_DELAY) == pdPASS) {
-            updateDisplay(1);
-            updateDisplay(2);
+            mettreAJourAffichage(1);
+            mettreAJourAffichage(2);
             xEventGroupSetBits(xDiagEventGroup, BIT_DISPLAY_OK);
         }
     }
