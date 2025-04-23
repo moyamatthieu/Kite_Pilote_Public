@@ -4,7 +4,6 @@
  * Ce fichier contient tous les paramètres de configuration du système,
  * organisés en sections pour faciliter la compréhension.
  * 
- * Créé le: 17/04/2025
  */
 
 #ifndef CONFIG_H
@@ -18,9 +17,10 @@
 #define VERSION_MAJOR 2             // Version majeure
 #define VERSION_MINOR 0             // Version mineure
 #define VERSION_PATCH 0             // Version correctif
-#define VERSION_BUILD 0             // Numéro de build
-#define VERSION_STRING "v2.0.0.0"   // Chaîne de version complète
-#define BUILD_DATE "19/04/2025"     // Date de la dernière modification
+#define VERSION_BUILD 5             // Numéro de build
+#define VERSION_STRING "v2.0.0.5"   // Chaîne de version complète
+#define FIRMWARE_VERSION VERSION_STRING // Alias pour compatibilité
+#define BUILD_DATE "23/04/2025"     // Date de la dernière modification
 
 //===============================================================
 // SECTION 2: CONFIGURATION GÉNÉRALE ET JOURNALISATION
@@ -144,6 +144,10 @@ const unsigned long LED_BLINK_INTERVAL = 1000;  // Intervalle de clignotement (m
 #define WIFI_ENABLED true               // Active/désactive le WiFi
 #define WIFI_DEFAULT_AP_SSID "KitePilote" // Nom du point d'accès WiFi
 #define WIFI_DEFAULT_AP_PASS "KitePilote123" // Mot de passe (min 8 caractères)
+
+// Alias pour compatibilité
+#define WIFI_AP_SSID WIFI_DEFAULT_AP_SSID
+#define WIFI_AP_PASSWORD WIFI_DEFAULT_AP_PASS
 #define WIFI_WEB_PORT 80                // Port du serveur web
 
 //===============================================================

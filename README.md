@@ -1,6 +1,79 @@
+# Kite Pilote
+
+Projet de pilote automatique pour cerf-volant générateur d'énergie basé sur ESP32.
+
+## Objectif
+
+Contrôler un cerf-volant pour optimiser la génération d'énergie en utilisant divers capteurs et actionneurs, avec une interface web pour la surveillance et le contrôle.
+
+## Fonctionnalités
+
+*   Lecture des capteurs (IMU, tension de ligne, vent)
+*   Contrôle des servomoteurs
+*   Logique d'autopilote (différents modes)
+*   Interface web via WiFi (mode AP ou Station)
+*   Affichage LCD/TFT
+*   Simulation via Wokwi
+*   Gestion des tâches via FreeRTOS
+
+## Configuration
+
+1.  **Installer PlatformIO** : Suivez les instructions sur [platformio.org](https://platformio.org/).
+2.  **Cloner le dépôt** : `git clone <URL_DU_DEPOT>`
+3.  **Ouvrir le projet** : Ouvrez le dossier cloné dans VS Code avec l'extension PlatformIO.
+4.  **Configurer le WiFi** : Modifiez les identifiants WiFi dans `include/core/config.h` si nécessaire.
+5.  **Vérifier les broches** : Assurez-vous que les définitions de broches dans `include/core/config.h` correspondent à votre matériel.
+
+## Compilation
+
+Vous pouvez utiliser le script Python fourni ou les commandes PlatformIO directement.
+
+**Avec le script Python :**
+
+```bash
+python3 script/build_scripts.py
+```
+
+**Avec PlatformIO :**
+
+1.  **Compiler le firmware :**
+    ```bash
+    pio run
+    ```
+2.  **Générer l'image LittleFS (si des fichiers dans `data/` ont changé) :**
+    ```bash
+    pio run --target buildfs
+    ```
+
+## Upload
+
+1.  **Uploader le firmware :**
+    ```bash
+    pio run --target upload
+    ```
+2.  **Uploader l'image LittleFS :**
+    ```bash
+    pio run --target uploadfs
+    ```
+
+## Utilisation
+
+*   Connectez l'ESP32.
+*   Ouvrez le moniteur série (`pio device monitor`) pour voir les logs.
+*   Si le WiFi est activé, connectez-vous au réseau WiFi de l'ESP32 (mode AP) ou trouvez son adresse IP sur votre réseau local (mode Station).
+*   Accédez à l'interface web via l'adresse IP de l'ESP32 dans un navigateur.
+
+## Simulation (Wokwi)
+
+Le projet est configuré pour la simulation sur Wokwi. Ouvrez le projet dans Wokwi et lancez la simulation.
+
+*   Le fichier `diagram.json` définit les composants simulés.
+*   Le fichier `wokwi.toml` configure la simulation.
+*   Le système de fichiers (`data/`) est simulé en utilisant la configuration dans `wokwi.toml` et `custom_partitions.csv`.
+
 # Projet Kite Pilote
 
-## Version: 2.0.0.1 — Dernière mise à jour: 21 Avril 2025
+## Version: 2.0.0.5 — Dernière mise à jour: 23 Avril 2025
 
 ## Présentation du projet
 
@@ -8,11 +81,26 @@ Le projet Kite Pilote est un système de contrôle automatique pour cerf-volant 
 
 Cette version du code a été refactorisée pour être plus accessible aux débutants en programmation Arduino et ESP32. La structure modulaire permet de comprendre facilement le fonctionnement de chaque partie du système.
 
-### Points clés de la dernière mise à jour (21 Avril 2025)
+### Points clés de la dernière mise à jour (23 Avril 2025)
 
-- **Optimisation du système de journalisation**: Implémentation d'une approche "inline singleton" dans logger.h pour éviter les définitions multiples
-- **Correction des warnings de compilation**: Résolution des problèmes liés aux dépendances et redéfinitions de macros
-- **Amélioration de la documentation**: Mise à jour du changelog et des README
+- **Modernisation C++**: Application des standards C++11/14 pour améliorer la robustesse et la sécurité du code
+  - Utilisation d'`enum class` au lieu d'`enum` simple pour une meilleure sécurité de typage
+  - Remplacement des `#define` par `constexpr` pour les constantes
+  - Utilisation de `std::function` pour les callbacks au lieu des pointeurs de fonction bruts
+  - Ajout du qualificateur `noexcept` aux fonctions appropriées
+  - Utilisation de `std::array` au lieu des tableaux C traditionnels
+  - Remplacement systématique de `NULL` par `nullptr`
+
+- **Système de bypass pour LittleFS**: Amélioration de la robustesse de l'interface web
+  - Mécanisme de secours en cas d'échec d'initialisation de LittleFS
+  - Tentative d'initialisation alternative sans spécifier de partition
+  - Interface HTML intégrée si toutes les tentatives échouent
+  - Messages d'erreur clairs et détaillés
+
+- **Optimisation du logger et des méthodes**: Maintien des meilleures pratiques C++
+  - Application rigoureuse du principe RAII pour la gestion des ressources
+  - Amélioration de la validation des entrées et de la gestion des erreurs
+  - Meilleure encapsulation et utilisation des qualificateurs const
 
 ### Concept technique
 
@@ -218,6 +306,10 @@ Le système intègre plusieurs mécanismes de sécurité :
 - Modes d'urgence en cas de conditions anormales
 
 - Journalisation des événements critiques
+
+- Gestion robuste des ressources (RAII) pour éviter les fuites mémoire
+
+- Systèmes de bypass automatiques pour maintenir les services essentiels même en cas de défaillance
 
 ## Mode d'emploi
 
@@ -440,7 +532,14 @@ Projet développé par l'équipe Kite Pilote.
 
 ## Historique des versions
 
-- **v2.0.0.1** (21/04/2025) - Version actuelle
+- **v2.0.0.5** (23/04/2025) - Version actuelle
+  - Application des standards C++ modernes (C++11/14) à plusieurs modules
+  - Implémentation d'un système de bypass pour LittleFS
+  - Utilisation de std::function pour les callbacks
+  - Remplacement de #define par constexpr pour les constantes
+  - Amélioration de la robustesse et de la sécurité du code
+
+- **v2.0.0.1** (21/04/2025)
   - Optimisation du système de journalisation (logger.h)
   - Correction des problèmes de compilation
   - Amélioration de la documentation

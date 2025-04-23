@@ -7,294 +7,264 @@
  * - Capteur de longueur des lignes
  * - Anémomètre/Girouette pour les données de vent
  * 
+ * Version: 2.0.0.5
  * Créé le: 17/04/2025
+ * Mis à jour le: 23/04/2025
  */
 
 #ifndef SENSOR_MODULE_H
 #define SENSOR_MODULE_H
 
 #include <Arduino.h>
+#include <Wire.h>
 #include "../core/config.h"
 #include "../core/data_types.h"
 #include "../utils/logger.h"
 
+#ifndef SIMULATION_MODE
+#include <MPU6050_tockn.h> // Bibliothèque pour l'IMU
+#include <HX711.h>        // Bibliothèque pour cellule de charge (tension des lignes)
+#endif
+
+/**
+ * @class SensorModule
+ * @brief Gère l'acquisition et le traitement des données des capteurs
+ * 
+ * Cette classe centralise toutes les opérations liées aux capteurs pour:
+ * - Initialiser les différents capteurs
+ * - Lire et filtrer les données
+ * - Valider les mesures et détecter les anomalies
+ * - Fournir une interface unifiée pour l'accès aux données
+ */
 class SensorModule {
 public:
-    // Constructeur
-    SensorModule() {
-        resetAllData();
-    }
+    /**
+     * @brief Constructeur par défaut
+     */
+    SensorModule();
     
-    // Initialisation des capteurs
-    bool begin() {
-        bool success = true;
-        
-        LOG_INFO("CAPTEUR", "Initialisation des capteurs...");
-        
-        // En mode simulation, les capteurs sont virtuels
-        #ifdef SIMULATION_MODE
-            LOG_INFO("CAPTEUR", "Mode simulation activé, utilisation de capteurs virtuels");
-            _imuInitialized = true;
-            _tensionSensorInitialized = true;
-            _lengthSensorInitialized = true;
-            _windSensorInitialized = true;
-        #else
-            // Dans un système réel, ici nous initialiserions chaque capteur physique
-            // Exemple non fonctionnel uniquement pour illustrer:
-            // _imuInitialized = initIMU();
-            // _tensionSensorInitialized = initTensionSensor();
-            // _lengthSensorInitialized = initLengthSensor();
-            // _windSensorInitialized = initWindSensor();
-            
-            // TODO: Implémenter l'initialisation des capteurs réels
-            LOG_WARNING("CAPTEUR", "L'initialisation des capteurs réels n'est pas implémentée");
-            
-            // Pour cette version on simule que tout est correct
-            _imuInitialized = true;
-            _tensionSensorInitialized = true;
-            _lengthSensorInitialized = true;
-            _windSensorInitialized = true;
-        #endif
-        
-        // Vérifier que l'initialisation a réussi pour tous les capteurs essentiels
-        if (!_imuInitialized) {
-            LOG_ERROR("CAPTEUR", "Échec de l'initialisation de l'IMU");
-            success = false;
-        }
-        
-        if (!_tensionSensorInitialized) {
-            LOG_ERROR("CAPTEUR", "Échec de l'initialisation du capteur de tension");
-            success = false;
-        }
-        
-        // L'anémomètre est optionnel, donc pas d'échec global si pas initialisé
-        if (!_windSensorInitialized) {
-            LOG_WARNING("CAPTEUR", "Anémomètre non disponible");
-        }
-        
-        return success;
-    }
+    /**
+     * @brief Destructeur
+     */
+    ~SensorModule();
     
-    // Mise à jour de tous les capteurs (à appeler dans la boucle principale)
-    void update() {
-        // En mode simulation, les données sont mises à jour par la fonction externe
-        // updateSensorsWithSimulationData() dans simulation.cpp
-        #ifndef SIMULATION_MODE
-            // En mode normal, nous lirions les capteurs physiques ici
-            updateIMU();
-            updateLineTension();
-            updateLineLength();
-            updateWindSensor();
-        #endif
-        
-        // Filtrer les données brutes pour éliminer le bruit
-        filterData();
-    }
+    /**
+     * @brief Initialise tous les capteurs du système
+     * @return true si l'initialisation s'est déroulée correctement
+     */
+    bool begin();
     
-    // Obtenir les données actuelles de l'IMU
-    IMUData getIMUData() const {
-        return _imuData;
-    }
+    /**
+     * @brief Met à jour les données de tous les capteurs
+     * Doit être appelée régulièrement dans la boucle principale
+     */
+    void update();
     
-    // Obtenir les données actuelles des lignes
-    LineData getLineData() const {
-        return _lineData;
-    }
+    /**
+     * @brief Récupère les données actuelles de l'IMU
+     * @return Structure IMUData contenant les mesures d'orientation
+     */
+    IMUData getIMUData() const;
     
-    // Obtenir les données actuelles du vent
-    WindData getWindData() const {
-        return _windData;
-    }
+    /**
+     * @brief Récupère les données actuelles des lignes
+     * @return Structure LineData contenant tension et longueur
+     */
+    LineData getLineData() const;
     
-    // Raccourcis vers les valeurs individuelles les plus utilisées
-    float getRoll() const { return _imuData.roll; }
-    float getPitch() const { return _imuData.pitch; }
-    float getYaw() const { return _imuData.yaw; }
-    float getLineTension() const { return _lineData.tension; }
-    float getLineLength() const { return _lineData.length; }
-    float getWindSpeed() const { return _windData.speed; }
-    float getWindDirection() const { return _windData.direction; }
+    /**
+     * @brief Récupère les données actuelles du vent
+     * @return Structure WindData contenant vitesse et direction
+     */
+    WindData getWindData() const;
     
-    // Vérifier la validité de tous les capteurs essentiels
-    bool allSensorsValid() const {
-        return _imuData.isValid && _lineData.isTensionValid;
-    }
+    // Accesseurs pour les valeurs individuelles fréquemment utilisées
+    /**
+     * @brief Renvoie l'angle de roulis actuel en degrés
+     * @return float Angle de roulis (-180 à +180)
+     */
+    float getRoll() const;
     
-    // Méthodes d'accès pour la simulation
-    void setIMUData(float roll, float pitch, float yaw) {
-        _imuData.roll = roll;
-        _imuData.pitch = pitch;
-        _imuData.yaw = yaw;
-        _imuData.isValid = true;
-        _imuData.timestamp = millis();
-    }
+    /**
+     * @brief Renvoie l'angle de tangage actuel en degrés
+     * @return float Angle de tangage (-90 à +90)
+     */
+    float getPitch() const;
     
-    void setLineTension(float tension) {
-        _lineData.tension = tension;
-        _lineData.isTensionValid = true;
-        _lineData.timestamp = millis();
-    }
+    /**
+     * @brief Renvoie l'angle de lacet actuel en degrés
+     * @return float Angle de lacet (0 à 359)
+     */
+    float getYaw() const;
     
-    void setLineLength(float length) {
-        _lineData.length = length;
-        _lineData.isLengthValid = true;
-        _lineData.timestamp = millis();
-    }
+    /**
+     * @brief Renvoie la tension actuelle des lignes en Newtons
+     * @return float Tension mesurée
+     */
+    float getLineTension() const;
     
-    void setWindData(float speed, float direction) {
-        _windData.speed = speed;
-        _windData.direction = direction;
-        _windData.isValid = true;
-        _windData.timestamp = millis();
-    }
+    /**
+     * @brief Renvoie la longueur actuelle des lignes en mètres
+     * @return float Longueur mesurée
+     */
+    float getLineLength() const;
+    
+    /**
+     * @brief Renvoie la vitesse actuelle du vent en m/s
+     * @return float Vitesse du vent
+     */
+    float getWindSpeed() const;
+    
+    /**
+     * @brief Renvoie la direction actuelle du vent en degrés
+     * @return float Direction du vent (0 à 359, 0 = Nord)
+     */
+    float getWindDirection() const;
+    
+    /**
+     * @brief Vérifie si tous les capteurs essentiels sont opérationnels
+     * @return true si tous les capteurs essentiels sont valides
+     */
+    bool allSensorsValid() const;
+    
+    /**
+     * @brief Effectue une calibration de l'IMU
+     * @return true si la calibration a réussi
+     */
+    bool calibrateIMU();
+    
+    /**
+     * @brief Effectue une calibration du capteur de tension
+     * @param knownWeight Poids connu en Newtons pour la calibration
+     * @return true si la calibration a réussi
+     */
+    bool calibrateTensionSensor(float knownWeight = 0.0f);
+    
+#ifdef SIMULATION_MODE
+    // Méthodes spécifiques au mode simulation
+    /**
+     * @brief Définit manuellement les données de l'IMU (simulation)
+     * @param roll Angle de roulis en degrés
+     * @param pitch Angle de tangage en degrés
+     * @param yaw Angle de lacet en degrés
+     */
+    void setIMUData(float roll, float pitch, float yaw);
+    
+    /**
+     * @brief Définit manuellement la tension des lignes (simulation)
+     * @param tension Tension en Newtons
+     */
+    void setLineTension(float tension);
+    
+    /**
+     * @brief Définit manuellement la longueur des lignes (simulation)
+     * @param length Longueur en mètres
+     */
+    void setLineLength(float length);
+    
+    /**
+     * @brief Définit manuellement les données du vent (simulation)
+     * @param speed Vitesse du vent en m/s
+     * @param direction Direction du vent en degrés
+     */
+    void setWindData(float speed, float direction);
+#endif
 
 private:
     // Données des capteurs
-    IMUData _imuData;
-    LineData _lineData;
-    WindData _windData;
+    IMUData m_imuData;
+    LineData m_lineData;
+    WindData m_windData;
     
     // États d'initialisation des capteurs
-    bool _imuInitialized;
-    bool _tensionSensorInitialized;
-    bool _lengthSensorInitialized;
-    bool _windSensorInitialized;
+    bool m_imuInitialized;
+    bool m_tensionSensorInitialized;
+    bool m_lengthSensorInitialized;
+    bool m_windSensorInitialized;
     
     // Constantes pour le filtrage
-    const float IMU_FILTER_ALPHA = 0.8f;  // Coefficient du filtre passe-bas pour l'IMU
-    const float TENSION_FILTER_ALPHA = 0.7f; // Coefficient pour la tension
-    const float LENGTH_FILTER_ALPHA = 0.9f;  // Coefficient pour la longueur
-    const float WIND_FILTER_ALPHA = 0.7f;    // Coefficient pour le vent
+    static constexpr float IMU_FILTER_ALPHA = 0.8f;  // Coefficient du filtre passe-bas pour l'IMU
+    static constexpr float TENSION_FILTER_ALPHA = 0.7f; // Coefficient pour la tension
+    static constexpr float LENGTH_FILTER_ALPHA = 0.9f;  // Coefficient pour la longueur
+    static constexpr float WIND_FILTER_ALPHA = 0.7f;    // Coefficient pour le vent
     
     // Valeurs filtrées précédentes (pour le filtre passe-bas)
-    float _filteredRoll;
-    float _filteredPitch;
-    float _filteredYaw;
-    float _filteredTension;
-    float _filteredLength;
-    float _filteredWindSpeed;
-    float _filteredWindDirection;
+    float m_filteredRoll;
+    float m_filteredPitch;
+    float m_filteredYaw;
+    float m_filteredTension;
+    float m_filteredLength;
+    float m_filteredWindSpeed;
+    float m_filteredWindDirection;
     
-    // Réinitialiser toutes les données capteurs
-    void resetAllData() {
-        // Réinitialiser les données de l'IMU
-        _imuData = IMUData();
-        
-        // Réinitialiser les données des lignes
-        _lineData = LineData();
-        
-        // Réinitialiser les données du vent
-        _windData = WindData();
-        
-        // Réinitialiser les états d'initialisation
-        _imuInitialized = false;
-        _tensionSensorInitialized = false;
-        _lengthSensorInitialized = false;
-        _windSensorInitialized = false;
-        
-        // Réinitialiser les valeurs filtrées
-        _filteredRoll = 0.0f;
-        _filteredPitch = 0.0f;
-        _filteredYaw = 0.0f;
-        _filteredTension = 0.0f;
-        _filteredLength = 0.0f;
-        _filteredWindSpeed = 0.0f;
-        _filteredWindDirection = 0.0f;
-    }
+#ifndef SIMULATION_MODE
+    // Instances des capteurs réels
+    MPU6050* m_imu;        // IMU pour orientation
+    HX711* m_loadCell;     // Cellule de charge pour tension
     
-    // Lecture de l'IMU (implémentation pour capteurs réels)
-    bool updateIMU() {
-        // TODO: Implémenter la lecture réelle de l'IMU
-        // Exemple fictif:
-        /*
-        if (_imuInitialized) {
-            // Lire les données brutes du capteur
-            float rawRoll = imu.getRoll();
-            float rawPitch = imu.getPitch();
-            float rawYaw = imu.getYaw();
-            
-            // Mettre à jour les données
-            _imuData.roll = rawRoll;
-            _imuData.pitch = rawPitch;
-            _imuData.yaw = rawYaw;
-            _imuData.isValid = true;
-            _imuData.timestamp = millis();
-            
-            return true;
-        }
-        */
-        return false; // Non implémenté dans cette version
-    }
+    // Paramètres de calibration
+    float m_tensionScale;  // Facteur d'échelle pour convertir les lectures en Newtons
+    float m_tensionOffset; // Offset pour le zéro
+#endif
+
+    /**
+     * @brief Réinitialise toutes les données des capteurs
+     */
+    void resetAllData();
     
-    // Lecture du capteur de tension
-    bool updateLineTension() {
-        // TODO: Implémenter la lecture réelle du capteur de tension
-        return false; // Non implémenté dans cette version
-    }
+    /**
+     * @brief Initialise l'IMU (MPU6050)
+     * @return true si l'initialisation a réussi
+     */
+    bool initIMU();
     
-    // Lecture du capteur de longueur
-    bool updateLineLength() {
-        // TODO: Implémenter la lecture réelle du capteur de longueur
-        return false; // Non implémenté dans cette version
-    }
+    /**
+     * @brief Initialise le capteur de tension des lignes
+     * @return true si l'initialisation a réussi
+     */
+    bool initTensionSensor();
     
-    // Lecture de l'anémomètre/girouette
-    bool updateWindSensor() {
-        // TODO: Implémenter la lecture réelle des capteurs de vent
-        return false; // Non implémenté dans cette version
-    }
+    /**
+     * @brief Initialise le capteur de longueur des lignes
+     * @return true si l'initialisation a réussi
+     */
+    bool initLengthSensor();
     
-    // Filtrage des données pour réduire le bruit
-    void filterData() {
-        // Filtre passe-bas simple pour l'IMU
-        if (_imuData.isValid) {
-            _filteredRoll = IMU_FILTER_ALPHA * _filteredRoll + (1 - IMU_FILTER_ALPHA) * _imuData.roll;
-            _filteredPitch = IMU_FILTER_ALPHA * _filteredPitch + (1 - IMU_FILTER_ALPHA) * _imuData.pitch;
-            _filteredYaw = IMU_FILTER_ALPHA * _filteredYaw + (1 - IMU_FILTER_ALPHA) * _imuData.yaw;
-            
-            _imuData.roll = _filteredRoll;
-            _imuData.pitch = _filteredPitch;
-            _imuData.yaw = _filteredYaw;
-        }
-        
-        // Filtre pour la tension des lignes
-        if (_lineData.isTensionValid) {
-            _filteredTension = TENSION_FILTER_ALPHA * _filteredTension + 
-                              (1 - TENSION_FILTER_ALPHA) * _lineData.tension;
-            _lineData.tension = _filteredTension;
-        }
-        
-        // Filtre pour la longueur des lignes
-        if (_lineData.isLengthValid) {
-            _filteredLength = LENGTH_FILTER_ALPHA * _filteredLength + 
-                             (1 - LENGTH_FILTER_ALPHA) * _lineData.length;
-            _lineData.length = _filteredLength;
-        }
-        
-        // Filtre pour les données de vent
-        if (_windData.isValid) {
-            _filteredWindSpeed = WIND_FILTER_ALPHA * _filteredWindSpeed + 
-                                (1 - WIND_FILTER_ALPHA) * _windData.speed;
-            
-            // Filtrage directionnel spécial pour éviter les problèmes à 0/360 degrés
-            float sinDirection = sin(_windData.direction * PI / 180.0);
-            float cosDirection = cos(_windData.direction * PI / 180.0);
-            
-            static float filteredSinDirection = sinDirection;
-            static float filteredCosDirection = cosDirection;
-            
-            filteredSinDirection = WIND_FILTER_ALPHA * filteredSinDirection + 
-                                  (1 - WIND_FILTER_ALPHA) * sinDirection;
-            filteredCosDirection = WIND_FILTER_ALPHA * filteredCosDirection + 
-                                  (1 - WIND_FILTER_ALPHA) * cosDirection;
-            
-            _filteredWindDirection = atan2(filteredSinDirection, filteredCosDirection) * 180.0 / PI;
-            if (_filteredWindDirection < 0) _filteredWindDirection += 360.0;
-            
-            _windData.speed = _filteredWindSpeed;
-            _windData.direction = _filteredWindDirection;
-        }
-    }
+    /**
+     * @brief Initialise les capteurs de vent (anémomètre/girouette)
+     * @return true si l'initialisation a réussi
+     */
+    bool initWindSensor();
+    
+    /**
+     * @brief Met à jour les données de l'IMU
+     * @return true si la mise à jour a réussi
+     */
+    bool updateIMU();
+    
+    /**
+     * @brief Met à jour les données de tension des lignes
+     * @return true si la mise à jour a réussi
+     */
+    bool updateLineTension();
+    
+    /**
+     * @brief Met à jour les données de longueur des lignes
+     * @return true si la mise à jour a réussi
+     */
+    bool updateLineLength();
+    
+    /**
+     * @brief Met à jour les données du vent
+     * @return true si la mise à jour a réussi
+     */
+    bool updateWindSensor();
+    
+    /**
+     * @brief Applique un filtrage aux données brutes
+     * Utilise des filtres passe-bas pour réduire le bruit
+     */
+    void filterData();
 };
 
 #endif // SENSOR_MODULE_H

@@ -409,6 +409,33 @@ Développer un système de pilotage automatique basé sur ESP32 pour un kite (ce
   - Définition d'une zone de vol sécurisée
   - Intervention automatique si le kite approche des limites
 
+### 3.10 Tolérance aux Pannes et Fonctionnement Dégradé
+- **Principe fondamental**
+  - Le système doit continuer à fonctionner même si certains modules ou composants tombent en panne
+  - Architecture résiliente permettant de maintenir les fonctions critiques en cas de défaillance partielle
+  - Hiérarchisation des fonctionnalités et définition des services essentiels à maintenir en priorité
+
+- **Mécanismes de bypass**
+  - Détection automatique des échecs d'initialisation ou de communication
+  - Systèmes de fallback pour chaque composant critique
+  - Tentatives alternatives de configuration avec paramètres différents (exemple: LittleFS avec différentes partitions)
+  - Modes dégradés prédéfinis pour chaque sous-système
+
+- **Redondance sélective**
+  - Duplication des fonctionnalités critiques par des moyens différents
+  - Capteurs alternatifs pouvant remplacer partiellement les capteurs principaux
+  - Moyens de communication secondaires (ex: communication série de secours si le WiFi échoue)
+
+- **Isolation des défaillances**
+  - Encapsulation de chaque module pour éviter la propagation des erreurs
+  - Vérification rigoureuse des valeurs de retour de toutes les fonctions d'initialisation
+  - Signalisation claire à l'utilisateur des fonctionnalités limitées ou indisponibles
+
+- **Récupération autonome**
+  - Tentatives périodiques de réinitialisation des modules défaillants
+  - Système de watchdog matériel et logiciel pour détecter et récupérer des blocages
+  - Journalisation des échecs pour analyse ultérieure et amélioration continue
+
 ## 4. Points Problématiques du Projet
 
 ### 4.1 Communication sans fil avec l'IMU

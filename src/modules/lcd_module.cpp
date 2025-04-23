@@ -18,8 +18,8 @@ LcdModule::LcdModule() :
 
 // Destructeur
 LcdModule::~LcdModule() {
-    // Libérer la mémoire allouée pour chaque instance LCD
-    for (LiquidCrystal_I2C* lcd : _lcds) {
+    // Libérer la mémoire allouée pour chaque instance LCD (application du RAII)
+    for (auto* lcd : _lcds) {
         if (lcd != nullptr) {
             delete lcd;
         }
@@ -37,7 +37,7 @@ void LcdModule::scanAndInitLcds() {
     _anyLcdInitialized = false;
 
     // Nettoyer les anciennes instances si begin() est appelé plusieurs fois
-    for (LiquidCrystal_I2C* lcd : _lcds) {
+    for (auto* lcd : _lcds) {
         if (lcd != nullptr) delete lcd;
     }
     _lcds.clear();
@@ -58,7 +58,7 @@ void LcdModule::scanAndInitLcds() {
         if (error == 0) {
             // Vérifier si l'adresse n'est pas déjà ajoutée (évite doublons si scan complet après scan commun)
             bool alreadyFound = false;
-            for(uint8_t foundAddr : _addrs) {
+            for (const auto foundAddr : _addrs) {
                 if (foundAddr == addr) {
                     alreadyFound = true;
                     break;
@@ -69,8 +69,8 @@ void LcdModule::scanAndInitLcds() {
             LOG_INFO("LCD", "Écran LCD détecté à l'adresse 0x%02X", addr);
 
             // Créer et initialiser l'écran
-            LiquidCrystal_I2C* newLcd = new LiquidCrystal_I2C(addr, LCD_COLS, LCD_ROWS);
-            if (!newLcd) {
+            auto* newLcd = new LiquidCrystal_I2C(addr, LCD_COLS, LCD_ROWS);
+            if (newLcd == nullptr) {
                 LOG_ERROR("LCD", "Échec d'allocation mémoire pour l'écran LCD à 0x%02X", addr);
                 return; // Passer à l'adresse suivante
             }
@@ -90,7 +90,7 @@ void LcdModule::scanAndInitLcds() {
 
                 // Initialiser le tampon pour cet écran
                 std::vector<std::vector<char>> screenBuffer(LCD_ROWS, std::vector<char>(LCD_COLS + 1, ' '));
-                for(auto& rowBuffer : screenBuffer) {
+                for (auto& rowBuffer : screenBuffer) {
                     rowBuffer[LCD_COLS] = '\0'; // Null-terminator
                 }
                 _lastLcdBuffers.push_back(screenBuffer);
@@ -150,14 +150,17 @@ bool LcdModule::begin() {
 // Afficher un message à une position spécifique sur tous les écrans
 bool LcdModule::print(const char* message, uint8_t col, uint8_t row) {
     if (!_anyLcdInitialized || col >= LCD_COLS || row >= LCD_ROWS) {
-        if (!_anyLcdInitialized) LOG_WARNING("LCD", "Aucun LCD initialisé pour print()");
-        else LOG_WARNING("LCD", "Coordonnées hors limites: %d,%d", col, row);
+        if (!_anyLcdInitialized) {
+            LOG_WARNING("LCD", "Aucun LCD initialisé pour print()");
+        } else {
+            LOG_WARNING("LCD", "Coordonnées hors limites: %d,%d", col, row);
+        }
         return false;
     }
 
     bool success = true;
     for (uint8_t i = 0; i < _numDetectedLcds; ++i) {
-        if (!_i2cErrors[i] && _lcds[i]) {
+        if (!_i2cErrors[i] && _lcds[i] != nullptr) {
             _lcds[i]->setCursor(col, row);
             _lcds[i]->print(message);
             // Mettre à jour le tampon _lastLcd si affichage complet sur la ligne
@@ -178,14 +181,17 @@ bool LcdModule::print(const char* message, uint8_t col, uint8_t row) {
 // Version surchargée pour accepter les chaînes Flash (F())
 bool LcdModule::print(const __FlashStringHelper* message, uint8_t col, uint8_t row) {
      if (!_anyLcdInitialized || col >= LCD_COLS || row >= LCD_ROWS) {
-        if (!_anyLcdInitialized) LOG_WARNING("LCD", "Aucun LCD initialisé pour print(F())");
-        else LOG_WARNING("LCD", "Coordonnées hors limites: %d,%d", col, row);
+        if (!_anyLcdInitialized) {
+            LOG_WARNING("LCD", "Aucun LCD initialisé pour print(F())");
+        } else {
+            LOG_WARNING("LCD", "Coordonnées hors limites: %d,%d", col, row);
+        }
         return false;
     }
 
     bool success = true;
     for (uint8_t i = 0; i < _numDetectedLcds; ++i) {
-        if (!_i2cErrors[i] && _lcds[i]) {
+        if (!_i2cErrors[i] && _lcds[i] != nullptr) {
             _lcds[i]->setCursor(col, row);
             _lcds[i]->print(message);
         } else {
@@ -197,31 +203,34 @@ bool LcdModule::print(const __FlashStringHelper* message, uint8_t col, uint8_t r
 
 // Effacer une ligne entière sur tous les écrans
 void LcdModule::clearLine(uint8_t row) {
-    if (!_anyLcdInitialized || row >= LCD_ROWS) return;
+    if (!_anyLcdInitialized || row >= LCD_ROWS) {
+        return;
+    }
 
-    char spaces[LCD_COLS + 1];
-    memset(spaces, ' ', LCD_COLS);
+    // Utilise std::array pour une gestion plus sûre de la mémoire
+    std::array<char, LCD_COLS + 1> spaces;
+    spaces.fill(' ');
     spaces[LCD_COLS] = '\0';
 
     for (uint8_t i = 0; i < _numDetectedLcds; ++i) {
-        if (!_i2cErrors[i] && _lcds[i]) {
-             printDiff(i, spaces, row); // Utiliser printDiff pour optimiser et maj buffer
-            // _lcds[i]->setCursor(0, row);
-            // _lcds[i]->print(spaces);
+        if (!_i2cErrors[i] && _lcds[i] != nullptr) {
+             printDiff(i, spaces.data(), row); // Utiliser printDiff pour optimiser et maj buffer
         }
     }
 }
 
 // Effacer tous les écrans
 void LcdModule::clear() {
-    if (!_anyLcdInitialized) return;
+    if (!_anyLcdInitialized) {
+        return;
+    }
 
     for (uint8_t i = 0; i < _numDetectedLcds; ++i) {
-        if (!_i2cErrors[i] && _lcds[i]) {
+        if (!_i2cErrors[i] && _lcds[i] != nullptr) {
             _lcds[i]->clear();
-             // Réinitialiser aussi le buffer interne après un clear complet
-            for(auto& rowBuffer : _lastLcdBuffers[i]) {
-                std::fill(rowBuffer.begin(), rowBuffer.end() -1, ' '); // Remplir de ' ' sauf le \0
+            // Réinitialiser aussi le buffer interne après un clear complet
+            for (auto& rowBuffer : _lastLcdBuffers[i]) {
+                std::fill(rowBuffer.begin(), rowBuffer.end() - 1, ' '); // Remplir de ' ' sauf le \0
             }
         }
     }
@@ -230,6 +239,12 @@ void LcdModule::clear() {
 // Supprimé: refresh() - la gestion d'erreur est implicite
 
 // Afficher une barre de progression sur tous les écrans
+// Cette fonction prend un pourcentage (0-100) et affiche une barre de progression
+// visuelle sur la ligne spécifiée de l'écran LCD. La barre utilise des caractères
+// de bloc complet pour la partie remplie et des tirets pour la partie vide.
+// Format: [########----] 45%
+// La largeur de la barre s'adapte automatiquement en fonction de la largeur de l'écran
+// tout en réservant l'espace nécessaire pour afficher le pourcentage.
 void LcdModule::showProgressBar(uint8_t row, int percentage) {
     if (!_anyLcdInitialized || row >= LCD_ROWS) return;
 
