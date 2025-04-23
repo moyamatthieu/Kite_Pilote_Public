@@ -4,6 +4,46 @@ Chaque entrée est horodatée avec précision, permettant de suivre l'évolution
 
 ## 2025-04-23
 
+### 15:27:00 - Amélioration de l'initialisation du système avec affichage anticipé
+- **Catégorie**: Robustesse, Interface utilisateur
+- **Action**:
+    - Réorganisation complète de la séquence d'initialisation du système
+    - Les écrans (LCD et TFT) sont maintenant initialisés en tout premier lieu
+    - Les LEDs d'état sont configurées dès le démarrage
+    - Affichage en temps réel des messages d'initialisation sur tous les périphériques
+    - Messages d'erreur affichés sur tous les périphériques simultanément
+    - Indication visuelle de code d'erreur avec code numérique
+    - Réorganisation de l'initialisation de la connexion WiFi et web
+- **Fichiers concernés**:
+    - `src/main.cpp`
+- **Impact**: Considérablement amélioré le feedback visuel pendant l'initialisation et le diagnostic en cas d'erreur
+- **Pourquoi**: Permet de voir immédiatement ce qui se passe pendant le démarrage, sans avoir à attendre que tous les modules soient initialisés. En cas d'erreur, tous les écrans et voyants affichent maintenant l'erreur de manière synchronisée.
+
+### 15:12:00 - Implémentation de la partition de stockage dédiée
+- **Catégorie**: Configuration, Robustesse
+- **Action**:
+    - Création d'une table de partitions personnalisée dans storage.csv
+    - Configuration spécifique d'une partition "storage" de type spiffs pour LittleFS
+    - Mise à jour de platformio.ini pour utiliser cette table de partitions
+    - Passage explicite à LittleFS comme système de fichiers
+- **Fichiers concernés**:
+    - `storage.csv` (nouveau)
+    - `platformio.ini`
+- **Impact**: Solution définitive au problème "partition not found" en spécifiant une partition dédiée
+- **Pourquoi**: Cette configuration garantit que le système dispose d'une partition correctement définie et identifiable pour le stockage des fichiers, évitant les problèmes d'initialisation de LittleFS.
+
+### 15:09:00 - Correction de l'initialisation de LittleFS dans main.cpp
+- **Catégorie**: Bugfix, Robustesse
+- **Action**:
+    - Correction de l'erreur "partition "spiffs" could not be found" (Error: 261)
+    - Implémentation d'une initialisation à deux niveaux avec fallback
+    - Tentative avec partition "storage" puis avec configuration par défaut
+    - Poursuite du démarrage même en cas d'échec d'initialisation du système de fichiers
+- **Fichiers concernés**:
+    - `src/main.cpp`
+- **Impact**: Résolution du problème de blocage au démarrage lié à LittleFS
+- **Pourquoi**: Cette modification augmente la fiabilité du démarrage du système même en cas de problème de configuration LittleFS, évitant ainsi le blocage complet du programme.
+
 ### 15:02:00 - Ajout d'un script de sauvegarde GitHub
 - **Catégorie**: Outillage, Configuration, Automatisation
 - **Action**:

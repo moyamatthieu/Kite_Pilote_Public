@@ -179,68 +179,153 @@ void mettreAJourAffichage(uint8_t screen = 1) {
     LOG_INFO("MAIN", "Affichage des informations sur l'écran %d", screen);
 }
 
+// Fonction pour afficher un message d'erreur sur tous les périphériques d'affichage
+void afficherErreur(const char* message, uint8_t codeErreur = 0) {
+    // Affichage sur console série
+    Serial.print("ERREUR: ");
+    Serial.print(message);
+    if (codeErreur > 0) {
+        Serial.print(" (Code: ");
+        Serial.print(codeErreur);
+        Serial.println(")");
+    } else {
+        Serial.println();
+    }
+    
+    // Affichage sur LCD
+    lcd.clear();
+    lcd.print("ERREUR:", 0, 0);
+    lcd.print(message, 0, 1);
+    if (codeErreur > 0) {
+        lcd.print("Code: ", 0, 2);
+        lcd.print(String(codeErreur).c_str(), 6, 2);
+    }
+    
+    // Affichage sur TFT avec gestion du texte
+    tft.fillRect(0, tft.height()-40, tft.width(), 40, ILI9341_RED);
+    tft.setCursor(5, tft.height()-35);
+    tft.setTextColor(ILI9341_WHITE);
+    String txtErreur = "ERREUR: ";
+    txtErreur += message;
+    tft.println(txtErreur);
+    
+    if (codeErreur > 0) {
+        tft.setCursor(5, tft.height()-15);
+        String txtCode = "Code: ";
+        txtCode += String(codeErreur);
+        tft.println(txtCode);
+    }
+    
+    // Indication LED
+    ledError.setPattern(LED_PATTERN_ERROR);
+}
+
 // Fonction d'initialisation du système
 bool initialiserLEDs() {
+    Serial.println("Initialisation des LEDs...");
     if (!ledStatus.begin()) {
-        LOG_ERROR("MAIN", "Échec d'initialisation de la LED de statut");
+        Serial.println("Échec d'initialisation de la LED de statut");
         return false;
     }
     if (!ledError.begin()) {
-        LOG_ERROR("MAIN", "Échec d'initialisation de la LED d'erreur");
+        Serial.println("Échec d'initialisation de la LED d'erreur");
         return false;
     }
     return true;
 }
 
 bool initialiserLCD() {
+    Serial.println("Initialisation de l'écran LCD...");
     if (!lcd.begin()) {
-        LOG_ERROR("MAIN", "Échec d'initialisation de l'écran LCD");
+        Serial.println("Échec d'initialisation de l'écran LCD");
+        // Vérifier si la LED d'erreur est disponible sans utiliser isInitialized()
         ledError.setPattern(LED_PATTERN_ON);
         return false;
     }
+    lcd.clear();
+    lcd.print("Kite Pilote " VERSION_STRING, 0, 0);
+    lcd.print("Demarrage...", 0, 1);
+    
     if (!lcd2.begin()) {
-        LOG_WARNING("MAIN", "Deuxième écran LCD non détecté, désactivé");
+        Serial.println("Deuxième écran LCD non détecté, désactivé");
     }
     return true;
 }
 
 bool initialiserCapteurs() {
+    Serial.println("Initialisation des capteurs...");
+    lcd.print("Init capteurs...", 0, 2);
+    tft.println("Initialisation capteurs...");
+    
     if (!sensors.begin()) {
+        Serial.println("Échec d'initialisation des capteurs");
         LOG_ERROR("MAIN", "Échec d'initialisation des capteurs");
         ledError.setPattern(LED_PATTERN_ON);
-        lcd.print("Erreur capteurs", 0, 2);
+        lcd.print("Err: capteurs", 0, 3);
+        tft.setTextColor(ILI9341_RED);
+        tft.println("ERREUR: Initialisation capteurs");
+        tft.setTextColor(ILI9341_WHITE);
         return false;
     }
+    tft.println("OK: Capteurs initialises");
     return true;
 }
 
 bool initialiserServos() {
+    Serial.println("Initialisation des servomoteurs...");
+    lcd.print("Init servos...", 0, 2);
+    tft.println("Initialisation servomoteurs...");
+    
     if (!servos.begin()) {
+        Serial.println("Échec d'initialisation des servomoteurs");
         LOG_ERROR("MAIN", "Échec d'initialisation des servomoteurs");
         ledError.setPattern(LED_PATTERN_ON);
-        lcd.print("Erreur servos", 0, 2);
+        lcd.print("Err: servos", 0, 3);
+        tft.setTextColor(ILI9341_RED);
+        tft.println("ERREUR: Initialisation servomoteurs");
+        tft.setTextColor(ILI9341_WHITE);
         return false;
     }
+    tft.println("OK: Servomoteurs initialises");
     return true;
 }
 
 bool initialiserAutopilot() {
+    Serial.println("Initialisation de l'autopilote...");
+    lcd.print("Init autopilote...", 0, 2);
+    tft.println("Initialisation autopilote...");
+    
     if (!autopilot.begin()) {
+        Serial.println("Échec d'initialisation de l'autopilote");
         LOG_ERROR("MAIN", "Échec d'initialisation de l'autopilote");
         ledError.setPattern(LED_PATTERN_ON);
+        lcd.print("Err: autopilote", 0, 3);
+        tft.setTextColor(ILI9341_RED);
+        tft.println("ERREUR: Initialisation autopilote");
+        tft.setTextColor(ILI9341_WHITE);
         return false;
     }
+    tft.println("OK: Autopilote initialise");
     return true;
 }
 
 #ifdef SIMULATION_MODE
 bool initialiserSimulation() {
+    Serial.println("Initialisation de la simulation...");
+    lcd.print("Init simulation...", 0, 2);
+    tft.println("Initialisation simulation...");
+    
     if (!simulation.begin()) {
+        Serial.println("Échec d'initialisation de la simulation");
         LOG_ERROR("MAIN", "Échec d'initialisation de la simulation");
         ledError.setPattern(LED_PATTERN_ON);
-        lcd.print("Erreur simulation", 0, 2);
+        lcd.print("Err: simulation", 0, 3);
+        tft.setTextColor(ILI9341_RED);
+        tft.println("ERREUR: Initialisation simulation");
+        tft.setTextColor(ILI9341_WHITE);
         return false;
     }
+    tft.println("OK: Simulation initialisee");
     return true;
 }
 #endif
@@ -289,31 +374,37 @@ bool initialiserWebInterface() {
 #endif
 
 bool initialiserTFT() {
+    Serial.println("Initialisation de l'écran TFT...");
     tft.begin();
     tft.setRotation(1);
     tft.fillScreen(ILI9341_BLACK);
     tft.setTextColor(ILI9341_WHITE);
     tft.setTextSize(2);
+    tft.setCursor(0, 0);
+    tft.println("KITE PILOTE v" VERSION_STRING);
+    tft.println("Initialisation du systeme...");
+    
     if (!ctp.begin(40)) {
         Serial.println("Erreur: écran tactile non détecté !");
+        tft.setTextColor(ILI9341_YELLOW);
+        tft.println("Ecran tactile non detecte");
+        tft.setTextColor(ILI9341_WHITE);
     } else {
         Serial.println("Tactile FT6206 prêt.");
+        tft.println("Ecran tactile initialise");
     }
     return true;
 }
 
-bool initialiserSysteme() {
+bool initialiserSystemeReorganise() {
     bool success = true;
     
-    Serial.begin(SERIAL_BAUD_RATE);
-    Serial.println("\n\n=== Démarrage du système Kite Pilote ===");
-    Serial.println("Version " VERSION_STRING " - " BUILD_DATE);
+    // Logger déjà initialisé dans setup()
+    LOG_INFO("MAIN", "Initialisation des modules...");
     
-    Logger::begin(LL_INFO);
-    LOG_INFO("MAIN", "Initialisation du système...");
+    // LEDs, LCD et TFT déjà initialisés dans setup()
     
-    success &= initialiserLEDs();
-    success &= initialiserLCD();
+    // Continuer avec les autres initialisations
     success &= initialiserCapteurs();
     success &= initialiserServos();
     success &= initialiserAutopilot();
@@ -323,15 +414,19 @@ bool initialiserSysteme() {
     #endif
     
     #if defined(WIFI_ENABLED) && WIFI_ENABLED
+    lcd.clear();
+    lcd.print("Init WiFi...", 0, 1);
+    tft.println("Connexion WiFi...");
     success &= initialiserWiFi();
     #endif
 
-    // Initialiser l'interface web (après le WiFi)
     #if defined(WIFI_ENABLED) && WIFI_ENABLED
+    lcd.clear();
+    lcd.print("Init interface web", 0, 1);
+    lcd.print("En cours...", 0, 2);
+    tft.println("Initialisation interface web...");
     success &= initialiserWebInterface();
     #endif
-    
-    success &= initialiserTFT();
     
     esp_task_wdt_init(10, true);
     esp_task_wdt_add(NULL);
@@ -343,13 +438,26 @@ bool initialiserSysteme() {
         LOG_INFO("MAIN", "Initialisation réussie");
         ledStatus.setPattern(LED_PATTERN_SLOW_BLINK);
         ledError.setPattern(LED_PATTERN_OFF);
-        lcd.print("Initialisation OK", 0, 2);
+        lcd.clear();
+        lcd.print("Kite Pilote " VERSION_STRING, 0, 0);
+        lcd.print("Initialisation OK", 0, 1);
+        lcd.print("Systeme pret", 0, 2);
+        
+        tft.println("Initialisation complete!");
+        tft.println("Systeme pret");
         delay(1000);
     } else {
         LOG_ERROR("MAIN", "Erreurs pendant l'initialisation");
         ledStatus.setPattern(LED_PATTERN_OFF);
         ledError.setPattern(LED_PATTERN_SLOW_BLINK);
+        
+        lcd.clear();
         lcd.print("ERREUR INIT SYSTEME", 0, 0);
+        
+        tft.setTextColor(ILI9341_RED);
+        tft.println("ERREUR D'INITIALISATION");
+        tft.println("Verifiez les logs");
+        tft.setTextColor(ILI9341_WHITE);
     }
     
     return success;
@@ -368,40 +476,122 @@ void simulateKite() {
 //=============================================================================
 
 void setup() {
+    // 1. Initialiser le port série en tout premier
     Serial.begin(115200);
+    Serial.println("\n\n========= KITE PILOTE v" VERSION_STRING " =========");
+    Serial.println("Démarrage du système - " BUILD_DATE);
+    
+    // 2. Initialiser les LEDs d'état en priorité pour indiquer le démarrage
+    initialiserLEDs();
+    ledStatus.setPattern(LED_PATTERN_SLOW_BLINK); // Indique démarrage en cours
+    
+    // 3. Initialiser l'écran TFT avant les premiers tests
+    initialiserTFT();
+    
+    // 4. Initialiser LCD pour afficher les messages
+    initialiserLCD();
+    
+    // 5. Initialiser le logger (seulement après avoir initialisé le port série)
+    Logger::begin(LL_INFO);
+    LOG_INFO("MAIN", "Initialisation du système Kite Pilote v%s", VERSION_STRING);
+    
+    // 6. Initialiser le système de fichiers
+    lcd.print("Init LittleFS...", 0, 2);
+    tft.println("Montage LittleFS...");
     Serial.println("Initialisation de LittleFS...");
-
-    if (!LittleFS.begin(true)) {
-        Serial.println("Erreur : Impossible de monter LittleFS");
-        return;
-    }
-    Serial.println("LittleFS monté avec succès !");
-
-    // Exemple de lecture d'un fichier
-    File fichier = LittleFS.open("/index.html", "r");
-    if (!fichier) {
-        Serial.println("Erreur : Impossible d'ouvrir le fichier /index.html");
+    bool fsOk = false;
+    
+    // Première tentative avec partition spécifique
+    if (LittleFS.begin(true, "/littlefs", 10, "storage")) {
+        Serial.println("LittleFS monté avec succès sur la partition 'storage'!");
+        tft.println("LittleFS OK: partition storage");
+        fsOk = true;
     } else {
-        Serial.println("Contenu de /index.html :");
-        while (fichier.available()) {
-            Serial.write(fichier.read());
+        Serial.println("Échec sur partition 'storage', tentative avec configuration par défaut...");
+        tft.setTextColor(ILI9341_YELLOW);
+        tft.println("Échec LittleFS: partition storage");
+        tft.println("Tentative par défaut...");
+        tft.setTextColor(ILI9341_WHITE);
+        
+        // Deuxième tentative sans spécifier de partition
+        if (LittleFS.begin(true)) {
+            Serial.println("LittleFS monté avec succès en mode par défaut!");
+            tft.println("LittleFS OK: mode par défaut");
+            fsOk = true;
+        } else {
+            Serial.println("AVERTISSEMENT: Initialisation de LittleFS impossible - fonctionnement dégradé");
+            tft.setTextColor(ILI9341_RED);
+            tft.println("ERREUR: LittleFS indisponible");
+            tft.println("Fonctionnement dégradé");
+            tft.setTextColor(ILI9341_WHITE);
+            // Nous continuons quand même, le système fonctionnera sans accès aux fichiers
         }
-        fichier.close();
+    }
+    
+    // Vérification optionnelle des fichiers seulement si le montage a réussi
+    if (fsOk) {
+        // Exemple de lecture d'un fichier
+        File fichier = LittleFS.open("/index.html", "r");
+        if (!fichier) {
+            Serial.println("Avertissement: Impossible d'ouvrir le fichier /index.html");
+            tft.setTextColor(ILI9341_YELLOW);
+            tft.println("Fichier index.html introuvable");
+            tft.setTextColor(ILI9341_WHITE);
+        } else {
+            Serial.println("Fichier index.html trouvé (taille: " + String(fichier.size()) + " octets)");
+            tft.println("Fichier index.html OK");
+            // Lecture du contenu (limité aux premiers caractères pour éviter de surcharger la console)
+            Serial.println("Début du fichier:");
+            int i = 0;
+            while (fichier.available() && i < 200) {
+                Serial.write(fichier.read());
+                i++;
+            }
+            if (fichier.available()) {
+                Serial.println("\n[...]");
+            }
+            fichier.close();
+        }
     }
 
-    if (!initialiserSysteme()) {
+    // 7. Finaliser l'initialisation du système avec affichage
+    lcd.print("Init modules...", 0, 3);
+    tft.println("\nInitialisation des modules...");
+    
+    if (!initialiserSystemeReorganise()) {
+        // Affichage d'erreur critique sur tous les périphériques
+        lcd.clear();
+        lcd.print("ERREUR CRITIQUE", 0, 0);
+        lcd.print("Systeme bloque", 0, 1);
+        
+        tft.fillScreen(ILI9341_RED);
+        tft.setCursor(0, 0);
+        tft.setTextColor(ILI9341_WHITE);
+        tft.println("ERREUR CRITIQUE");
+        tft.println("Initialisation echouee");
+        tft.println("Redemarrage necessaire");
+        
+        Serial.println("\n\n****** ERREUR CRITIQUE D'INITIALISATION ******");
+        Serial.println("Le système ne peut pas démarrer, redémarrage nécessaire");
+        
+        // Boucle d'erreur avec clignotement
         while (true) {
             ledError.update();
             delay(100);
         }
     }
+    
+    // Passage en mode veille après l'initialisation
     autopilot.setMode(AUTOPILOT_STANDBY);
     lcd.clear();
     lcd.print("Kite Pilote v" VERSION_STRING, 0, 0);
     lcd.print("Systeme pret", 0, 1);
     lcd.print("Mode: Attente", 0, 2);
     
+    tft.println("\nDémarrage des tâches...");
     vCreateTasks();
+    tft.println("Système opérationnel");
+    
     vTaskDelete(NULL);
 }
 

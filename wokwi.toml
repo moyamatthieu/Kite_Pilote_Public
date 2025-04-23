@@ -2,7 +2,7 @@
 version = 1
 firmware = ".pio/build/esp32dev/firmware.bin"
 elf = ".pio/build/esp32dev/firmware.elf"
-partitions = "custom_partitions.csv" # Utiliser la table de partitions personnalisée
+partitions = "storage.csv" # Utiliser la table de partitions personnalisée
 
 # Forward http://localhost:8180 to port 80 on the simulated ESP32:
 [[net.forward]]
