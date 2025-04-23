@@ -90,10 +90,51 @@ def extract_latest_changes():
     
     return f"{title}\nCatégorie: {category}\n{action}"
 
+def list_modified_files():
+    """Liste tous les fichiers modifiés, ajoutés, supprimés, etc."""
+    output = run_command("git status --porcelain")
+    if not output:
+        return []
+    
+    files = []
+    for line in output.split('\n'):
+        if line.strip():
+            # Le format est "XY chemin/du/fichier"
+            # où X est le statut dans l'index et Y le statut dans le répertoire de travail
+            status = line[:2]
+            file_path = line[3:].strip()
+            files.append((status, file_path))
+    
+    return files
+
 def stage_all_changes():
     """Ajoute tous les fichiers modifiés au staging"""
     print("Ajout des fichiers modifiés...")
-    run_command("git add .", "Échec de l'ajout des fichiers")
+    
+    # Utiliser git add -A pour ajouter aussi les fichiers supprimés
+    run_command("git add -A", "Échec de l'ajout des fichiers")
+    
+    # Afficher les fichiers qui ont été ajoutés
+    modified_files = list_modified_files()
+    
+    if modified_files:
+        print("\nFichiers ajoutés au commit:")
+        for status, file_path in modified_files:
+            status_desc = ""
+            if status[0] == 'M':
+                status_desc = "[Modifié]"
+            elif status[0] == 'A':
+                status_desc = "[Ajouté]"
+            elif status[0] == 'D':
+                status_desc = "[Supprimé]"
+            elif status[0] == 'R':
+                status_desc = "[Renommé]"
+            elif status[0] == '?':
+                status_desc = "[Non suivi]"
+            else:
+                status_desc = f"[{status}]"
+            
+            print(f"  {status_desc} {file_path}")
 
 def create_commit(version, changes):
     """Crée un commit avec un message descriptif"""
@@ -133,6 +174,7 @@ def main():
     parser = argparse.ArgumentParser(description="Sauvegarde le projet Kite Pilote sur GitHub")
     parser.add_argument("--remote", default="origin", help="Nom du remote Git (défaut: origin)")
     parser.add_argument("--branch", default="main", help="Nom de la branche Git (défaut: main)")
+    parser.add_argument("--force-add", nargs="+", help="Force l'ajout de fichiers/dossiers spécifiques (même s'ils sont dans .gitignore)")
     args = parser.parse_args()
     
     print(f"Script de sauvegarde GitHub: démarrage ({datetime.now().strftime('%H:%M:%S')})...")
@@ -153,7 +195,16 @@ def main():
     # Extraire les dernières modifications
     changes = extract_latest_changes()
     
-    # Ajouter les fichiers
+    # Ajouter les fichiers spécifiques si demandé
+    if args.force_add:
+        for path in args.force_add:
+            if os.path.exists(path):
+                print(f"Ajout forcé de {path}...")
+                run_command(f"git add -f {path}", f"Échec de l'ajout forcé de {path}")
+            else:
+                print(f"AVERTISSEMENT: Le chemin {path} n'existe pas et ne peut pas être ajouté.")
+    
+    # Ajouter tous les fichiers modifiés
     stage_all_changes()
     
     # Créer le commit
