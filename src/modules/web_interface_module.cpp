@@ -2,7 +2,7 @@
  * Implémentation du module d'interface web pour le projet Kite Pilote
  *
  * Ce module implémente une interface web responsive accessible via WiFi pour
- * contrôler et surveiller le système à distance. Il utilise LittleFS pour stocker
+ * contrôler et surveiller le système à distance. Il utilise SPIFFS pour stocker
  * les fichiers HTML, CSS et JavaScript.
  *
  * Version: 2.0.0.5
@@ -11,9 +11,12 @@
 
 #include "modules/web_interface_module.h"
 #include "utils/logger.h"
+#include <SPIFFS.h>
 
 // Constructeur
-WebInterfaceModule::WebInterfaceModule() :
+WebInterfaceModule::WebInterfaceModule(AutopilotModule& autopilot, SensorModule& sensors) :
+    _autopilot(autopilot),
+    _sensors(sensors),
     _server(WIFI_WEB_PORT),
     _events("/events"),
     _initialized(false),
@@ -35,9 +38,15 @@ WebInterfaceModule::~WebInterfaceModule() {
     end(); // S'assurer que les ressources sont libérées
 }
 
-// Fonction privée pour servir les fichiers depuis LittleFS
+// Fonction privée pour servir les fichiers depuis SPIFFS
 bool WebInterfaceModule::handleFileRead(AsyncWebServerRequest *request, const String& path) {
     LOG_DEBUG("WEB", "HTTP: Requête pour %s", path.c_str());
+    
+    // Vérifier si le système de fichiers est disponible
+    if (!_fsAvailable) {
+        LOG_DEBUG("WEB", "HTTP: Système de fichiers non disponible");
+        return false;
+    }
     
     // Si path se termine par un slash, servir index.html
     String adjustedPath = path;
@@ -56,8 +65,8 @@ bool WebInterfaceModule::handleFileRead(AsyncWebServerRequest *request, const St
     else if (adjustedPath.endsWith(".json")) contentType = "application/json";
 
     // Vérifier si le fichier existe
-    if (LittleFS.exists(adjustedPath)) {
-        request->send(LittleFS, adjustedPath, contentType);
+    if (SPIFFS.exists(adjustedPath)) {
+        request->send(SPIFFS, adjustedPath, contentType);
         return true;
     }
     
@@ -74,29 +83,28 @@ bool WebInterfaceModule::begin(bool apMode) {
 
     LOG_INFO("WEB", "WebInterface: Initialisation du module...");
     
-    // Initialiser le système de fichiers en spécifiant le label de la partition
-    // LittleFS.begin(formatOnFail, basePath, maxOpenFiles, partitionLabel)
-    if (!LittleFS.begin(true, "/littlefs", 10, "storage")) { 
-        LOG_WARNING("WEB", "WebInterface: Échec du montage de LittleFS sur la partition 'storage', utilisation du mode secours");
+    // Initialiser le système de fichiers
+    if (!SPIFFS.begin(false)) {
+        LOG_WARNING("WEB", "WebInterface: Échec du montage de SPIFFS, tentative avec formatage");
         _fsType = FileSystemType::FS_NONE;
         _fsAvailable = false;
         
-        // Deuxième tentative avec partition par défaut (sans label spécifique)
-        if (LittleFS.begin(true)) {
-            LOG_INFO("WEB", "WebInterface: LittleFS initialisé avec la partition par défaut");
-            _fsType = FileSystemType::FS_LITTLEFS;
+        // Deuxième tentative avec formatage
+        if (SPIFFS.begin(true)) {
+            LOG_INFO("WEB", "WebInterface: SPIFFS initialisé avec formatage");
+            _fsType = FileSystemType::FS_LITTLEFS; // Garder la même enum pour compatibilité
             _fsAvailable = true;
         } else {
-            LOG_ERROR("WEB", "WebInterface: Échec de la deuxième tentative d'initialisation LittleFS, mode HTML intégré activé");
+            LOG_ERROR("WEB", "WebInterface: Échec de l'initialisation SPIFFS, mode HTML intégré activé");
             // Continuer sans système de fichiers, l'interface utilisera getEmbeddedHtml()
         }
     } else {
-        _fsType = FileSystemType::FS_LITTLEFS;
+        _fsType = FileSystemType::FS_LITTLEFS; // Garder la même enum pour compatibilité
         _fsAvailable = true;
-        LOG_INFO("WEB", "WebInterface: LittleFS initialisé avec succès sur la partition 'storage'");
+        LOG_INFO("WEB", "WebInterface: SPIFFS initialisé avec succès");
         
-        // Liste des fichiers dans LittleFS pour débogage
-        File root = LittleFS.open("/");
+        // Liste des fichiers dans SPIFFS pour débogage
+        File root = SPIFFS.open("/");
         File file = root.openNextFile();
         while (file) {
             String fileName = file.name();
@@ -188,35 +196,84 @@ void WebInterfaceModule::setupWebServer() {
 
 // Configurer les routes API et les gestionnaires de fichiers
 void WebInterfaceModule::setupRoutes() {
-    // Route par défaut pour servir les fichiers statiques depuis LittleFS
+    // Route par défaut pour servir les fichiers statiques depuis SPIFFS
     if (_fsAvailable) {
-        _server.serveStatic("/", LittleFS, "/").setCacheControl("max-age=31536000");
-    }
-    
-    // Gestionnaire de fichiers non trouvés (fallback)
-    _server.onNotFound([this](AsyncWebServerRequest *request) {
-        // Essayer de servir un fichier
-        if (!handleFileRead(request, request->url())) {
-            // Si fichier non trouvé et système de fichiers non disponible, générer HTML intégré
-            if (!_fsAvailable) {
-                request->send(200, "text/html", getEmbeddedHtml());
-            } else {
+        _server.serveStatic("/", SPIFFS, "/").setCacheControl("max-age=31536000");
+        
+        // Gestionnaire de fichiers non trouvés (fallback) quand le système de fichiers est disponible
+        _server.onNotFound([this](AsyncWebServerRequest *request) {
+            // Essayer de servir un fichier
+            if (!handleFileRead(request, request->url())) {
                 request->send(404, "text/plain", "Fichier non trouvé");
             }
-        }
-    });
+        });
+    } else {
+        // Si le système de fichiers n'est pas disponible, toujours servir l'HTML intégré
+        _server.onNotFound([this](AsyncWebServerRequest *request) {
+            request->send(200, "text/html", getEmbeddedHtml());
+        });
+    }
 
-    // API pour obtenir le statut
+    // API pour obtenir le statut détaillé
     _server.on("/api/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("application/json");
         DynamicJsonDocument doc(JSON_BUFFER_SIZE);
         
+        // Informations système
         doc["version"] = FIRMWARE_VERSION;
         doc["uptime"] = millis() / 1000;
         doc["fsType"] = (_fsType == FileSystemType::FS_LITTLEFS) ? "LittleFS" : "Aucun";
         doc["freeHeap"] = ESP.getFreeHeap();
+        doc["wifiMode"] = _apMode ? "AP" : "Client";
+        doc["connectedClients"] = getConnectedClientsCount();
         
-        serializeJson(doc, *response);
+        // État de l'autopilote
+        JsonObject autopilot = doc.createNestedObject("autopilot");
+        autopilot["mode"] = _autopilot.getMode();
+        autopilot["statusMessage"] = _autopilot.getStatusMessage();
+        autopilot["powerGenerated"] = _autopilot.getPowerGenerated();
+        autopilot["totalEnergy"] = _autopilot.getTotalEnergy();
+        
+        // Informations sur les capteurs
+        JsonObject sensors = doc.createNestedObject("sensors");
+        sensors["imuValid"] = _sensors.getIMUData().isValid;
+        sensors["lineTensionValid"] = _sensors.getLineData().isTensionValid;
+        sensors["windValid"] = _sensors.getWindData().isValid;
+        
+        ::serializeJson(doc, *response);
+        request->send(response);
+    });
+    
+    // API pour diagnostics détaillés
+    _server.on("/api/diagnostics", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        AsyncResponseStream* response = request->beginResponseStream("application/json");
+        DynamicJsonDocument doc(JSON_BUFFER_SIZE);
+        
+        // Informations détaillées sur les capteurs
+        JsonObject sensors = doc.createNestedObject("sensors");
+        JsonObject imu = sensors.createNestedObject("imu");
+        imu["roll"] = _sensors.getRoll();
+        imu["pitch"] = _sensors.getPitch();
+        imu["yaw"] = _sensors.getYaw();
+        
+        JsonObject line = sensors.createNestedObject("line");
+        line["tension"] = _sensors.getLineTension();
+        line["length"] = _sensors.getLineLength();
+        
+        JsonObject wind = sensors.createNestedObject("wind");
+        wind["speed"] = _sensors.getWindSpeed();
+        wind["direction"] = _sensors.getWindDirection();
+        
+        // État détaillé de l'autopilote
+        JsonObject autopilotStatus = doc.createNestedObject("autopilot");
+        autopilotStatus["mode"] = _autopilot.getMode();
+        autopilotStatus["statusMessage"] = _autopilot.getStatusMessage();
+        autopilotStatus["targetDirection"] = _autopilot.getTargetDirectionAngle();
+        autopilotStatus["targetTrim"] = _autopilot.getTargetTrimAngle();
+        autopilotStatus["targetWinchMode"] = static_cast<int>(_autopilot.getTargetWinchMode());
+        autopilotStatus["targetWinchPower"] = _autopilot.getTargetWinchPower();
+        
+        response->print(doc.as<String>());
         request->send(response);
     });
     
@@ -244,7 +301,7 @@ void WebInterfaceModule::setupRoutes() {
             doc["error"] = "Paramètre 'mode' manquant";
         }
         
-        serializeJson(doc, *response);
+        ::serializeJson(doc, *response);
         request->send(response);
     });
     
@@ -298,8 +355,53 @@ void WebInterfaceModule::setupRoutes() {
         request->send(response);
     });
     
+    // API nécessitant une authentification
+    _server.on("/api/diagnostics", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        if (!this->checkAuthentication(request)) {
+            return;
+        }
+        AsyncResponseStream* response = request->beginResponseStream("application/json");
+        DynamicJsonDocument doc(JSON_BUFFER_SIZE);
+        
+        // Informations détaillées sur les capteurs
+        JsonObject sensors = doc.createNestedObject("sensors");
+        JsonObject imu = sensors.createNestedObject("imu");
+        imu["roll"] = _sensors.getRoll();
+        imu["pitch"] = _sensors.getPitch();
+        imu["yaw"] = _sensors.getYaw();
+        
+        JsonObject line = sensors.createNestedObject("line");
+        line["tension"] = _sensors.getLineTension();
+        line["length"] = _sensors.getLineLength();
+        
+        JsonObject wind = sensors.createNestedObject("wind");
+        wind["speed"] = _sensors.getWindSpeed();
+        wind["direction"] = _sensors.getWindDirection();
+        
+        // État détaillé de l'autopilote
+        JsonObject autopilotStatus = doc.createNestedObject("autopilot");
+        autopilotStatus["mode"] = _autopilot.getMode();
+        autopilotStatus["statusMessage"] = _autopilot.getStatusMessage();
+        autopilotStatus["targetDirection"] = _autopilot.getTargetDirectionAngle();
+        autopilotStatus["targetTrim"] = _autopilot.getTargetTrimAngle();
+        autopilotStatus["targetWinchMode"] = static_cast<int>(_autopilot.getTargetWinchMode());
+        autopilotStatus["targetWinchPower"] = _autopilot.getTargetWinchPower();
+        
+        response->print(doc.as<String>());
+        request->send(response);
+    });
     // Configuration des événements côté serveur (SSE)
     _server.addHandler(&_events);
+}
+        return true; // Authentification désactivée si identifiants vides
+    }
+    
+    // Vérifier les identifiants d'authentification
+    if (!request->authenticate(_username.c_str(), _password.c_str())) {
+        request->requestAuthentication();
+        return false;
+    }
+    return true;
 }
 
 // Mettre à jour l'interface avec de nouvelles données
@@ -344,8 +446,8 @@ void WebInterfaceModule::sendSystemUpdate(const SystemStatus& status, const Auto
     wind["direction"] = windData.direction;
     
     // Convertir en chaîne JSON
-    String jsonString;
-    serializeJson(doc, jsonString);
+        String jsonString;
+        ::serializeJson(doc, jsonString);
     
     // Envoyer l'événement avec les données
     _events.send(jsonString.c_str(), "system-update", _eventId++);
@@ -363,8 +465,8 @@ void WebInterfaceModule::sendNotification(const char* message, const char* type)
     doc["type"] = type;
     
     // Convertir en chaîne JSON
-    String jsonString;
-    serializeJson(doc, jsonString);
+        String jsonString;
+        ::serializeJson(doc, jsonString);
     
     // Envoyer l'événement avec les données de notification
     _events.send(jsonString.c_str(), "notification", _eventId++);

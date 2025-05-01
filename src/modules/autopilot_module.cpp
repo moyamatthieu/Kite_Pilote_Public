@@ -303,10 +303,11 @@ void AutopilotModule::updateEightPatternMode() {
     float centerFactor = abs(cos(2 * cyclePosition * PI / 180.0f));
     _targetWinchPower = 50.0f + 30.0f * centerFactor;
     
-    // Mise à jour de la puissance générée (simulation simple)
+    // Mise à jour de la puissance générée (simulation améliorée)
     float windFactor = _lastWindData.isValid ? (_lastWindData.speed / 10.0f) : 1.0f;
-    float instantPower = _targetWinchPower * windFactor;
-    _status.powerGenerated = 0.8f * _status.powerGenerated + 0.2f * instantPower;
+    float tensionFactor = _lastLineData.isTensionValid ? (_lastLineData.tension / 500.0f) : 1.0f;
+    float instantPower = _targetWinchPower * windFactor * tensionFactor;
+    _status.powerGenerated = 0.9f * _status.powerGenerated + 0.1f * instantPower;
     
     // Accumuler l'énergie totale (Wh)
     _status.addEnergy(_status.powerGenerated * (1.0f / 3600.0f / 20.0f));  // 1/20e de seconde en heures
@@ -368,12 +369,13 @@ void AutopilotModule::updatePowerGenerationMode() {
     
     // Mise à jour de la puissance générée (simulation plus réaliste)
     float windFactor = _lastWindData.isValid ? (_lastWindData.speed / 10.0f) : 1.0f;
-    float tensionFactor = _lastLineData.isTensionValid ? (_lastLineData.tension / 50.0f) : 1.0f;
-    float instantPower = _targetWinchPower * windFactor * tensionFactor;
-    _status.powerGenerated = 0.8f * _status.powerGenerated + 0.2f * instantPower;
+    float tensionFactor = _lastLineData.isTensionValid ? (_lastLineData.tension / 500.0f) : 1.0f;
+    float efficiencyFactor = 0.8f; // Rendement du système
+    float instantPower = _targetWinchPower * windFactor * tensionFactor * efficiencyFactor;
+    _status.powerGenerated = 0.9f * _status.powerGenerated + 0.1f * instantPower;
     
     // Accumuler l'énergie totale (Wh)
-    _status.addEnergy(_status.powerGenerated * (1.0f / 3600.0f / 20.0f));  // 1/20e de seconde en heures
+    _status.addEnergy(_status.powerGenerated * (UPDATE_INTERVAL_MS / 1000.0f / 3600.0f));
 }
 
 // Fonction utilitaire pour mapper une valeur float

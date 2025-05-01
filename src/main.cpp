@@ -16,7 +16,7 @@
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_FT6206.h>
 #include <WiFi.h>
-#include "LittleFS.h"
+#include "SPIFFS.h"
 
 // Inclusions des modules de base
 #include "core/config.h"
@@ -496,32 +496,27 @@ void setup() {
     LOG_INFO("MAIN", "Initialisation du système Kite Pilote v%s", VERSION_STRING);
     
     // 6. Initialiser le système de fichiers
-    lcd.print("Init LittleFS...", 0, 2);
-    tft.println("Montage LittleFS...");
-    Serial.println("Initialisation de LittleFS...");
+    lcd.print("Init SPIFFS...", 0, 2);
+    tft.println("Montage SPIFFS...");
+    Serial.println("Initialisation de SPIFFS...");
     bool fsOk = false;
     
     // Première tentative avec partition spécifique
-    if (LittleFS.begin(true, "/littlefs", 10, "storage")) {
-        Serial.println("LittleFS monté avec succès sur la partition 'storage'!");
-        tft.println("LittleFS OK: partition storage");
+    if (SPIFFS.begin(false)) {
+        Serial.println("SPIFFS monté avec succès!");
+        tft.println("SPIFFS OK");
         fsOk = true;
     } else {
-        Serial.println("Échec sur partition 'storage', tentative avec configuration par défaut...");
-        tft.setTextColor(ILI9341_YELLOW);
-        tft.println("Échec LittleFS: partition storage");
-        tft.println("Tentative par défaut...");
-        tft.setTextColor(ILI9341_WHITE);
-        
-        // Deuxième tentative sans spécifier de partition
-        if (LittleFS.begin(true)) {
-            Serial.println("LittleFS monté avec succès en mode par défaut!");
-            tft.println("LittleFS OK: mode par défaut");
+        // Si échec, essayer avec formatage
+        Serial.println("Échec du montage, tentative avec formatage...");
+        if (SPIFFS.begin(true)) {
+            Serial.println("SPIFFS monté avec succès après formatage!");
+            tft.println("SPIFFS OK (formaté)");
             fsOk = true;
         } else {
-            Serial.println("AVERTISSEMENT: Initialisation de LittleFS impossible - fonctionnement dégradé");
+            Serial.println("AVERTISSEMENT: Initialisation de SPIFFS impossible - fonctionnement dégradé");
             tft.setTextColor(ILI9341_RED);
-            tft.println("ERREUR: LittleFS indisponible");
+            tft.println("ERREUR: SPIFFS indisponible");
             tft.println("Fonctionnement dégradé");
             tft.setTextColor(ILI9341_WHITE);
             // Nous continuons quand même, le système fonctionnera sans accès aux fichiers
@@ -531,12 +526,24 @@ void setup() {
     // Vérification optionnelle des fichiers seulement si le montage a réussi
     if (fsOk) {
         // Exemple de lecture d'un fichier
-        File fichier = LittleFS.open("/index.html", "r");
+        File fichier = SPIFFS.open("/index.html", "r");
         if (!fichier) {
             Serial.println("Avertissement: Impossible d'ouvrir le fichier /index.html");
             tft.setTextColor(ILI9341_YELLOW);
             tft.println("Fichier index.html introuvable");
             tft.setTextColor(ILI9341_WHITE);
+            
+            // Créer un fichier index.html minimal si nécessaire
+            File createFile = SPIFFS.open("/index.html", "w");
+            if (createFile) {
+                createFile.println("<html><head><title>Kite Pilote</title></head><body>");
+                createFile.println("<h1>Kite Pilote - Interface Web</h1>");
+                createFile.println("<p>Interface web minimale générée automatiquement.</p>");
+                createFile.println("</body></html>");
+                createFile.close();
+                Serial.println("Fichier index.html minimal créé");
+                tft.println("Fichier index.html créé");
+            }
         } else {
             Serial.println("Fichier index.html trouvé (taille: " + String(fichier.size()) + " octets)");
             tft.println("Fichier index.html OK");

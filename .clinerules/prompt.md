@@ -3,7 +3,8 @@
 ## Règles Générales
 - Parle en français
 - Francise le projet autant que possible
-- Utilise des noms de fonction en français sauf pour les fonctions système d'Arduino comme `setup()` et `loop()`
+- Utilise des noms de fonction en français sauf pour les fonctions système d'Arduino comme `setup()` et `loop()- ++++ adhérence max = verifie que tu ne te perd pas en circonvolusion
+- ++++ ameliore ce prompt en fonction de ton apprentissage !
 
 ## Documentation des Modifications
 - Documenter toute modification, même mineure, dans le changelog.

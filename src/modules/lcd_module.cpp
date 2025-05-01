@@ -465,9 +465,19 @@ uint8_t LcdModule::getNumDetectedLcds() const {
 // Méthode privée pour afficher les différences sur un écran spécifique
 void LcdModule::printDiff(uint8_t lcdIndex, const char* message, uint8_t row) {
     // Vérifications de base
-    if (lcdIndex >= _numDetectedLcds || !_lcds[lcdIndex] || _i2cErrors[lcdIndex] || row >= LCD_ROWS) {
+    if (lcdIndex >= _numDetectedLcds || !_lcds[lcdIndex] || row >= LCD_ROWS) {
         return;
     }
+    
+    // Vérifier l'état I2C avant d'écrire
+    Wire.beginTransmission(_addrs[lcdIndex]);
+    uint8_t error = Wire.endTransmission();
+    if (error != 0) {
+        _i2cErrors[lcdIndex] = true;
+        LOG_ERROR("LCD", "Erreur I2C détectée sur l'écran %d à l'adresse 0x%02X", lcdIndex, _addrs[lcdIndex]);
+        return;
+    }
+    
 
     LiquidCrystal_I2C* lcd = _lcds[lcdIndex];
     std::vector<char>& lastRowBuffer = _lastLcdBuffers[lcdIndex][row];

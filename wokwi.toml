@@ -9,9 +9,5 @@ partitions = "storage.csv" # Utiliser la table de partitions personnalisée
 from = "localhost:8180"
 to = "target:80"
 
-[wokwi.esp32.filesystem] # Restauré pour fournir les fichiers web à la simulation
+[wokwi.esp32.filesystem] # Utilisation de SPIFFS pour fournir les fichiers web à la simulation
 "/" = "./data"
-
-# [wokwi.littlefs] # Section supprimée pour forcer l'utilisation de la partition table
-# "style.css" = "data/style.css"
-# "index.html" = "data/index.html"
