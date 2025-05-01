@@ -66,11 +66,24 @@ static void vTaskDisplay(void* pvParameters) {
 }
 
 static void vTaskWiFi(void* pvParameters) {
+    uint8_t retryCount = 0;
+    constexpr uint8_t maxRetries = 5;
+    
     for (;;) {
         if (WiFi.status() != WL_CONNECTED) {
-            WiFi.reconnect();
+            if (retryCount < maxRetries) {
+                WiFi.reconnect();
+                retryCount++;
+            } else {
+                // Réinitialisation du WiFi si trop de tentatives échouées
+                WiFi.disconnect();
+                delay(100);
+                WiFi.begin(WIFI_SSID, WIFI_PASS);
+                retryCount = 0;
+            }
         } else {
             xEventGroupSetBits(xDiagEventGroup, BIT_WIFI_OK);
+            retryCount = 0; // Réinitialiser le compteur en cas de connexion réussie
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

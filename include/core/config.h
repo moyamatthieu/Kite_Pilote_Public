@@ -17,10 +17,10 @@
 #define VERSION_MAJOR 2             // Version majeure
 #define VERSION_MINOR 0             // Version mineure
 #define VERSION_PATCH 0             // Version correctif
-#define VERSION_BUILD 5             // Numéro de build
-#define VERSION_STRING "v2.0.0.5"   // Chaîne de version complète
+#define VERSION_BUILD 6             // Numéro de build
+#define VERSION_STRING "v2.0.0.6"   // Chaîne de version complète
 #define FIRMWARE_VERSION VERSION_STRING // Alias pour compatibilité
-#define BUILD_DATE "23/04/2025"     // Date de la dernière modification
+#define BUILD_DATE "24/04/2025"     // Date de la dernière modification
 
 //===============================================================
 // SECTION 2: CONFIGURATION GÉNÉRALE ET JOURNALISATION
@@ -249,5 +249,8 @@ enum ErrorCode {
 
 // Timeout de diagnostic (en ms)
 #define DIAG_CHECK_INTERVAL_MS 5000
+
+// Intervalle de mise à jour de l'autopilote (en ms)
+#define UPDATE_INTERVAL_MS 50
 
 #endif // CONFIG_H

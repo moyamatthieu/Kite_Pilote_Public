@@ -20,11 +20,13 @@
 #include <ArduinoJson.h>
 #include <DNSServer.h>
 #include <FS.h>
-#include <LittleFS.h>
+#include <SPIFFS.h>
 #include <functional>
 #include "../core/config.h"
 #include "../core/data_types.h"
 #include "../utils/logger.h"
+#include "autopilot_module.h"
+#include "sensor_module.h"
 
 // Constantes pour la configuration du serveur web
 constexpr size_t JSON_BUFFER_SIZE = 2048; // Taille maximale pour les payloads JSON
@@ -179,10 +181,21 @@ private:
     DNSServer* _dnsServer;       // Serveur DNS pour captive portal
     uint32_t _eventId;           // Identifiant incrémental pour les événements SSE
 
+    // Authentification
+    String _username;
+    String _password;
+    
     // Callbacks
     std::function<void(AutopilotMode)> _onModeChangeCallback;
     std::function<void(float, float)> _onDirectionChangeCallback;
     std::function<void()> _onEmergencyCallback;
+    
+    // Références aux modules nécessaires
+    AutopilotModule& _autopilot;
+    SensorModule& _sensors;
+
+    // Méthode d'authentification
+    bool checkAuthentication(AsyncWebServerRequest *request);
 };
 
 #endif // WEB_INTERFACE_MODULE_H

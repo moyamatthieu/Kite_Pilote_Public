@@ -1,0 +1,21 @@
+{
+  "current_model": "google/gemini-pro",
+  "usage_counts": {
+    "anthropic/claude-3-haiku": 0,
+    "google/gemini-pro": 0,
+    "meta-llama/llama-3-8b-instruct": 0,
+    "mistralai/mistral-7b-instruct": 0
+  },
+  "last_reset": {
+    "anthropic/claude-3-haiku": "2025-04-24T10:32:50.077070",
+    "google/gemini-pro": "2025-04-24T10:32:50.077092",
+    "meta-llama/llama-3-8b-instruct": "2025-04-24T10:32:50.077096",
+    "mistralai/mistral-7b-instruct": "2025-04-24T10:32:50.077099"
+  },
+  "availability": {
+    "anthropic/claude-3-haiku": true,
+    "google/gemini-pro": true,
+    "meta-llama/llama-3-8b-instruct": true,
+    "mistralai/mistral-7b-instruct": true
+  }
+}
